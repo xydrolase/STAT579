@@ -27,8 +27,7 @@ midpoints <- function(x){
 intervals <- function(x){
     return (matrix(
         x[c(1, rep(2:(length(x)-1), each=2), length(x))], 
-        ncol=2, byrow=T) + 
-        matrix(rep(c(1, -1), each=length(x)-1), ncol=2))
+        ncol=2, byrow=T))
 }
 @
     \verb=midpoints= is the function to calculate the midpoints given $k+1$ endpoints of $k$ bins. \verb=intervals= is another simple function that helps us to build matrices whose rows are interval of bins given the endpoints. 
@@ -36,37 +35,25 @@ intervals <- function(x){
     Also, it is obvious that regardless of how we partition the range of values into $k$ bins, the underlying compress process is the same. So we build another function to compress a matrix into a $k$ gray-scale matrix, given the $k+1$ endpoints that can be generated in any approach.
 
     I was trying to implement the \verb=compress()= function that handles any generic $k$, rather than a fixed $8$. 
-    To group the data points into $k$ bins, we need to find an elegent way of partitioning the values, given the intervals of the bins.
-    One natural approach I can easily come up with is to put back the $k+1$ end points of $k$ bins into the vector of data points, and sort the vector. Assume we can somehow mark or tag the end points, then we can easily parition the data points into bins, given the indices of the end points in the sorted vector. 
-
-    My little trick to mark these end points is to use complex numbers. The $k+1$ end points are tagged by adding an imaginary term, whereas normal data points only have a real component.
-    Once we sort the vector, we can easily assign the pixels that fall into particular bin, by choosing values with sorted orders within interval, with the corresponding mid-point value. 
+    To group the data points into $k$ bins, we only need to construct a matrix to store the intervals and midpoints for each bin, and substitute any pixels or data points that fall into the certain interval with the corresponding mid-point value.
 <<>>=
 compress <- function(m, endpoints){
     mid.pts <- midpoints(endpoints)
-    # Tag the endpoints such that they can be easily identified in the sorted
-    # vector. And mix them into the data point for sorting.
 
     m.dim <- dim(m)
 
-    full.pts <- c(endpoints + 1i, as.vector(m))
-    pts.order <- order(full.pts)
-    marked.indices <- which(Im(full.pts[pts.order]) > 0)
-
-    bins <- cbind(intervals(marked.indices), mid.pts)
+    data.pts <- as.vector(m)
+    bins <- cbind(intervals(endpoints), mid.pts)
 
     # Compress the data into bins
     apply(bins, 1, 
         function(x){
-            full.pts[pts.order[seq(from=x[1], to=x[2])]] <<- x[3]
+            data.pts[x[1] <= data.pts & data.pts <= x[2]] <<- x[3]
         })
-    full.pts[pts.order[1]] <- mid.pts[1]
 
-    return (matrix(Re(full.pts[-(1:length(marked.indices))]),
-        nrow=m.dim[1], ncol=m.dim[2]))
+    return (matrix(data.pts, nrow=m.dim[1], ncol=m.dim[2]))
 }
 @
-    The line \verb={full.pts[pts.order[1]] <- mid.pts[1]= is a small tweak that manually assigns the minimal midpoint to the minimal data point. One may refine this by constructing the \verb=bins= matrix with fixed $1$ and $N$ as the terminal indices. But since the tweak works, I'm kind of lazy to fix that.
     
     \begin{enumerate}[i.]
     \item Okay, so, now we can get our work done. First, we group the data points into equally ranged intervals (bins). Again, define a wrapper function that eases life.
@@ -131,6 +118,7 @@ d.truncated <- d
 d.truncated[d.truncated < 1000] <- 0
 image(d.truncated, col=gray((1:256)/256))
 @
+
     Comparing the plot above with what we got in 2(b), clearly we can see more details in the brain, which will hopefully help us to make more accurate diagnosis.
     \end{enumerate}
 \end{enumerate}
