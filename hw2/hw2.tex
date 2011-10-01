@@ -1,0 +1,206 @@
+\documentclass[letter]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath, amssymb}
+\usepackage{enumerate}
+\usepackage{fancyhdr}
+\usepackage{graphicx}
+\usepackage{titlesec}
+
+\pagestyle{fancy}
+\fancyhead[L]{STAT 579 HW1}
+\fancyhead[R]{Xin Yin}
+\titleformat{\section}{\em\Large} {$\dagger$ \thesection .}{10pt}{}
+
+\begin{document}
+    \section{}
+    The R code for this problem is,
+    \begin{verbatim}
+sd.short <- function(smp){
+    n <- length(smp)
+    smp.mean <- sum(smp) / n
+    smp.sq.mean <- sum(smp^2) / n 
+
+    biased.sd <- smp.sq.mean - smp.mean^2
+    return (sqrt(biased.sd * n / (n-1)))
+}
+
+sd.long <- function(smp){
+    n <- length(smp)
+    smp.mean <- sum(smp) / n 
+    smp.ss <- (smp - smp.mean)^2
+
+    smp.dev <- sqrt(sum(smp.ss)/(n-1))
+    return (smp.dev)
+}
+
+num <- rep(c(1001, 1002), times=5) 
+print (c(sd.short(num), sd.long(num), sd(num)))
+
+    [1] 0.5270463 0.5270463 0.5270463
+
+num.1 <- rep(c(100000000000001, 100000000000002), times=5)
+print (c(sd.short(num.1), sd.long(num.1), sd(num.1)))
+
+    [1] 0.0000000 0.5270463 0.5270463
+    \end{verbatim}
+    The output for two \verb=print= calls is pasted within the code segment.
+
+    To solve the exactly same problem in Excel, we can call \verb=STDEV= 
+    function in any cell, \emph{e.g.} \verb|=STDEV(1001, 1002, 1001...)|.
+    This gives us two standard deviations,
+    \begin{verbatim}
+    0.527046
+    0.527046
+    \end{verbatim}
+
+    The SAS code is,
+    \begin{verbatim}
+data smp;
+	input x y;
+	datalines;
+	1001 100000000000001
+	1002 100000000000002
+	1001 100000000000001
+	1002 100000000000002
+	1001 100000000000001
+	1002 100000000000002
+	1001 100000000000001
+	1002 100000000000002
+	1001 100000000000001
+	1002 100000000000002
+run;
+
+proc means stddev data=num;
+	var x ;
+run;
+    \end{verbatim}
+    which yields,
+    \begin{verbatim}
+                              The MEANS Procedure
+
+                           Variable         Std Dev
+                           ------------------------
+                           x              0.5270463
+                           y                      0
+                           ------------------------
+    \end{verbatim}
+    Apparently, SAS has precision problem dealing with large numbers, while
+    Excel and R are doing fine. 
+    Using the short formula to calculate standard deviation also has the same
+    precision problem.
+
+    \section{}
+    Source code for solving problem 2 is presented below. Output for summary measurements are pasted with correspondence to the code.
+
+    \begin{verbatim}
+# Problem 2
+wind <- read.csv("wind.csv", header=T)
+
+# Summary of measurements
+mean(wind)
+
+       Spring    Summer    Autumn    Winter 
+    176.66667  80.83333 200.00000 238.33333 
+
+sd(wind)
+
+       Spring    Summer    Autumn    Winter 
+    123.97458  72.92067  94.00193  86.63752 
+
+apply(wind, 2, quantile, probes=c(0, 0.25, 0.5, 0.75, 1))
+
+         Spring Summer Autumn Winter
+    0%        0     10     30   50.0
+    25%      55     20    155  205.0
+    50%     185     35    215  255.0
+    75%     275    150    260  297.5
+    100%    350    190    350  340.0
+
+apply(wind, 2, IQR)
+
+    Spring Summer Autumn Winter 
+     220.0  130.0  105.0   92.5
+
+n <- dim(wind)[2]
+for (i in 1:n){
+    if (dev.cur()[1] == 1){
+        pdf('wind.pdf')
+
+        plot(x=i/2*cos(wind[,i]*pi/180), y=i/2*sin(wind[,i]*pi/180),
+            xlab='Cos(wind angle) scaled by season', 
+            ylab='Sin(wind angle) scaled by season',
+            xlim=c(-n/2, n/2), ylim=c(-n/2, n/2),
+            col=i, pch=i,
+            main="Wind direction by season")
+    }
+    else {
+        points(x=i/2*cos(wind[,i]*pi/180), y=i/2*sin(wind[,i]*pi/180),
+                col=i, pch=i)
+    }
+
+    lines(x=i/2*cos(seq(0, 2*pi, length.out=180)),
+            y=i/2*sin(seq(0, 2*pi, length.out=180)),
+            col=i, lty='dotted'
+          )
+}
+
+abline(v=c(0), col='lightgray', lty='dotted')
+abline(h=c(0), col='lightgray', lty='dotted')
+legend("topright", names(wind), col=1:n, pch=1:n)
+dev.off()
+    \end{verbatim}
+
+    \begin{enumerate}
+        \item[(b)] Please refer to the code above for summary measurements.
+        \item[(c)] Though the data is in angular form, all the values are
+        within $[0, 360]$ range. Therefore, some of the reported measurements are still
+        meaningful statistics to understand the general trend and variance of
+        wind directions across four season, \emph{e.g.} the means of wind
+        direction quantify the averaged wind direction in different seasons,
+        and the sample deviations measure the variation of wind directions. 
+
+        The quartiles, if examined independently given a particular season,
+        don't make too much sense. But if we compare the quartiles across four
+        seasons, we can get some sense about how wind direction ranges and varies in
+        different seasons.
+        \item[(d)]
+        The code presented above plots the wind directions as a bivariate plot. 
+        I tried to plot the $\cos(\theta), \sin(\theta)$ pair at first, but
+        many data points overlap with each other across different seasons. So I
+        plotted the wind directions as the $\cos()$ and $\sin()$ values, scaled
+        by a radius factor to distinguish different seasons.
+        Note that for wind direction notations, 0 denotes north wind, and 90
+        denotes east wind etc etc. So in order to visualize the wind direction
+        correctly using the $\cos$ and $\sin$ functions, we have to transform
+        the angles using following formula:
+        \[
+        \hat \theta = 360-(\theta-90)
+        \]
+
+        \begin{figure}[htp]
+        \centering
+        \includegraphics[width=0.5\textwidth]{wind.pdf}
+        \caption{Wind directions in four seasons}
+        \end{figure}
+
+        From the innermost to outermost, four circles denote the four seasons
+        from spring to winter. And you can still read the direction of the
+        wind, regarding the whole plot as if a polar coordinate system. Each
+        point represents the direction that wind blows from, and is colored
+        based on season.
+
+        Based on the this graph, we can clearly see that:
+        \begin{enumerate}[i)]
+        \item (South)east wind is rare in spring
+        \item South and north winds are predominant during summer
+        \item Wind varies significantly during the fall that it can come from
+        any direction. Based on this graph however, diagonal winds tend to be
+        more rare.
+        \item During winter, wind tends to blow from the west, as few dots can
+        be seen on the east.
+        \end{enumerate}
+    \end{enumerate}
+    
+
+    
+\end{document}

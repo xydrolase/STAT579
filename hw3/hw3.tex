@@ -1,0 +1,174 @@
+\documentclass{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath, amssymb}
+\usepackage{enumerate}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{verbatim}
+\usepackage{/usr/share/R/share/texmf/tex/latex/Sweave}
+
+
+\pagestyle{fancy}
+\fancyhead[L]{STAT 579 HW3}
+\fancyhead[R]{Xin Yin}
+\titleformat{\section}{\em\Large} {$\dagger$ \thesection .}{10pt}{}
+
+\begin{document}
+    \section{}
+    \begin{enumerate}[(a)]
+    \item
+    Delve into the dataset by reading it into R, specifying the delimiter to be the Tab. 
+\begin{Schunk}
+\begin{Sinput}
+> bill <- read.table("http://maitra.public.iastate.edu/stat579/datasets/senate-109.txt", 
++     sep = "\t", header = T)
+\end{Sinput}
+\end{Schunk}
+    \item 
+
+    \begin{enumerate}[i.]
+    \item
+    Rename the verbose name to \verb=bill_type=, and use regular expression to truncate the full bill name to its type only. 
+\begin{Schunk}
+\begin{Sinput}
+> names(bill)[1] <- "bill_type"
+> bill[, 1] <- sub("^([^_]+)_.*", "\\1", bill[, 1])
+\end{Sinput}
+\end{Schunk}
+    \item
+    And tabulate the numbers of each bill type,
+\begin{Schunk}
+\begin{Sinput}
+> bill.tbl <- table(bill[, 1])
+> print(head(bill.tbl))
+\end{Sinput}
+\begin{Soutput}
+           Abortion Issues         Agriculture Issues 
+                        17                          6 
+            Appropriations        Arts and Humanities 
+                        93                          1 
+Budget, Spending and Taxes     Business and Consumers 
+                        69                          7 
+\end{Soutput}
+\end{Schunk}
+    and to visualize it,
+\begin{Schunk}
+\begin{Sinput}
+> par(mar = c(12, 4.1, 4.1, 2.1))
+> plot(1:length(bill.tbl), bill.tbl, xaxt = "n", typ = "h", lwd = 2, 
++     xlab = "", ylab = "Count of bill")
+> axis(1, at = 1:length(bill.tbl), las = 2, labels = names(bill.tbl), 
++     cex.axis = 0.7)
+> axis(2)
+\end{Sinput}
+\end{Schunk}
+\includegraphics{hw3-004}
+    \end{enumerate}
+    \item One good property of how this data was arranged is that, no matter you vote against or vote with a bill, you multiply your choice by itself always yields a 1. 
+    Therefore, to do the matrix multiplication, $\mathbf{XX}'$
+    will give us a matrix, whose diagnol terms $\mathbf{X}_{ii}$ are the sums of votes for each bill.
+
+    To check if there's any discrepancy in the \verb=missing_votes= column, we examine this column vector with a vector of transformed diagonal terms $100 - \text{diag}(\mathbf{XX}')$.
+
+\begin{Schunk}
+\begin{Sinput}
+> vote <- as.matrix(bill[, 3:102])
+> vote.count <- diag(vote %*% t(vote))
+> all(100 - vote.count == bill$missing_votes)
+\end{Sinput}
+\begin{Soutput}
+[1] TRUE
+\end{Soutput}
+\end{Schunk}
+    Seems the data quality is pretty good and we can move on.
+
+    \item To transform the matrix into one with relative votes with regard to the majority leaader, we first need to throw away those bills Senate Bill Frist didn't vote for.
+\begin{Schunk}
+\begin{Sinput}
+> vote.senate <- subset(vote, vote[, 100] != 0)
+> dim(vote.senate)[1] == sum(abs(vote[, 100]))
+\end{Sinput}
+\begin{Soutput}
+[1] TRUE
+\end{Soutput}
+\end{Schunk}
+    We extract Senator Frist's vote as a vector $v_1$. We can leverage the fact that if we take a column vector $v_2$ from matrix \verb=vote.senate= iteratively, and perform arithmatic multiplication between the two vectors $v_1, v_2$, we can get a new vector $v_1'$ whose elements represent exactly the relative vote for the corresponding Senator with regard to Bill Frist's.
+\begin{Schunk}
+\begin{Sinput}
+> vote.leader <- vote.senate[, 100]
+> vote.relative <- vote.leader * vote.senate
+\end{Sinput}
+\end{Schunk}
+    Let's do some little experiment to check if this operation returns what we
+    expected. We can compare the President's votes back to that time with Seator Bill Frist's,
+\begin{Schunk}
+\begin{Sinput}
+> vote.cmp <- cbind(vote.senate[1:5, 2], vote.senate[1:5, 100], 
++     vote.relative[1:5, 2])
+> colnames(vote.cmp) <- colnames(vote.senate)[c(2, 100, 2)]
+> vote.cmp
+\end{Sinput}
+\begin{Soutput}
+     Barack.H..Obama..IL. William.H..Bill.Frist..TN. Barack.H..Obama..IL.
+[1,]                    1                         -1                   -1
+[2,]                   -1                          1                   -1
+[3,]                   -1                          1                   -1
+[4,]                    1                         -1                   -1
+[5,]                    1                         -1                   -1
+\end{Soutput}
+\end{Schunk}
+    Hmmm... Bipartisan politicians and their games. Well, at least we've done our job right and we're happy to move on.
+
+    \item Now we are interested in for each bill, how many Senators voted with or against, and how many novoters are there at Capitol Hill. To do this, we use \verb=outer()= function to map the relative vote matrix into a 3-dimensional array. The values on the 3rd dimension is simply the set $\{-1, 0, 1\}$. So we will have three planes expanded on 1st and 2nd dimensions, each of them is a $438 \times 100$ matrix, whose values are logical \verb=TRUE='s and \verb=FALSE='s, indicating if a senator voted against/indifferently/with a bill or not.
+\begin{Schunk}
+\begin{Sinput}
+> vote.choice <- outer(vote.relative, -1:1, "==")
+\end{Sinput}
+\end{Schunk}
+    Since we only care about how many people did what choices for a certain bill but not so much about who, we sum over the \verb=TRUE='s on 1st and 3rd dimension, which will end up with a $483 \times 3$ matrix. Each column of this matrix is the sum of votes for a certain bill under a particular choice (vote against, indifferently or vote with).
+\begin{Schunk}
+\begin{Sinput}
+> vote.aggregated <- apply(vote.choice, MARGIN = c(1, 3), FUN = sum)
+\end{Sinput}
+\end{Schunk}
+
+    Well, so far, this matrix still doesn't make sense to us, because from the beginning, we have chopped away the bill names and IDs. We need to aggregate our counts again, grouping by the bill types and vote choices. To do this, we use the \verb=aggregate()= function to construct a \verb=data.frame= that contains the matched count of votes, bill types as well as vote choices.
+    
+\begin{Schunk}
+\begin{Sinput}
+> vote.tbl <- aggregate(as.vector(vote.aggregated), by = list(bill_type = rep(factor(bill[vote[, 
++     100] != 0, 1]), times = 3), choice = rep(factor(c("against", 
++     "indifferently", "with")), each = dim(vote.aggregated)[1])), 
++     FUN = sum)
+> names(vote.tbl)[3] <- "count"
+> print(head(vote.tbl))
+\end{Sinput}
+\begin{Soutput}
+                   bill_type  choice count
+1            Abortion Issues against   520
+2         Agriculture Issues against   131
+3             Appropriations against  1436
+4        Arts and Humanities against     7
+5 Budget, Spending and Taxes against  2219
+6     Business and Consumers against   290
+\end{Soutput}
+\end{Schunk}
+
+    Ah, verbose numbers. So we again visualize this tabulated data, using a bar chart.
+\begin{Schunk}
+\begin{Sinput}
+> library(ggplot2)
+> p <- ggplot(vote.tbl, aes(x = bill_type, y = count, fill = choice))
+> print(p + opts(axis.text.x = theme_text(angle = -90, hjust = 0)) + 
++     xlab("Bill Type") + ylab("Count of votes") + geom_bar())
+\end{Sinput}
+\end{Schunk}
+\includegraphics{hw3-012}
+
+    Well, looking at this plot prompts many interesting thoughts.
+    For instance, budget bills are, unsurprisingly, a view into the bipartisan nature of Capitol Hill.
+    And also the immigration, health issue bills etc etc.
+    \end{enumerate}
+
+    \include{prob2}
+\end{document}

@@ -1,0 +1,327 @@
+\documentclass[letter]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath, amssymb}
+\usepackage{enumerate}
+\usepackage{fancyhdr}
+\usepackage{graphicx}
+\usepackage{titlesec}
+
+\pagestyle{fancy}
+\fancyhead[L]{STAT 579 HW1}
+\fancyhead[R]{Xin Yin}
+\titleformat{\section}{\em\Large} {$\dagger$ \thesection .}{10pt}{}
+
+\begin{document}
+    \section{}
+    \begin{verbatim}
+# Read dataset
+d <- read.table("http://maitra.public.iastate.edu/stat579/datasets/student-apt.dat", header=F)
+names(d) <- c('disp', 'apt', 'math', 'lang', 'gknol')
+
+# Factorize disciplines 
+disp_levels <- c('tech', 'arch', 'med')
+index <- 1
+for (lvl in disp_levels){
+    d$disp[which(d$disp == index)] <- lvl
+    index <- index +1
+}
+
+d$disp <- factor(d$disp, levels=disp_levels)
+
+# Plot pairwise scatterplot 
+library(ggplot2)
+plot_pairs <- matrix(data=c('apt', 'math', 'lang', 'gknol'), 
+                    nrow=2, ncol=2)
+
+for (nr in 1:2){
+    filename <- paste(plot_pairs[nr, 1], '_', plot_pairs[nr, 2], '.pdf',
+                sep="")
+
+    print(filename)
+    pdf(filename)
+
+    p <- ggplot(d, aes(x=d[, plot_pairs[nr, 1]],
+                       y=d[, plot_pairs[nr, 2]]))
+    # output the actual graph
+    print(p + geom_point(aes(colour=disp)) + 
+        scale_x_continuous(plot_pairs[nr, 1]) + 
+        scale_y_continuous(plot_pairs[nr, 2]))
+
+    dev.off()
+}
+    \end{verbatim}
+    \begin{enumerate}[(a)]
+        \item Refer to code above
+        \item Two scatterplots(Figure~\ref{fig:scatterplot}) can be drawn for students' quantitative
+        performance in four subjects across three groups.
+        \item 
+        On the first subplot, a general trend can be seen that architecture
+        students perform generally well both in aptitude and language.
+        Technical students have larger variance among sampled individuals, but
+        a vague positive correlation between their aptitude and language
+        performance can be seen (I have no opinion about why so). Finally, for
+        medical students, many of them clustered around left-bottom corner,
+        indicating inferior performance in both aptitude and language comparing
+        with two other groups. Again, a weak correlation between aptitude and
+        language can be observed for medical students.
+
+        On the second subplot, one clear indication is that majority of
+        students perform mediocre in general knowledge. Their lack of general
+        knowledge is independent of their mathematics performance. Another
+        information can be sensed from the plot is that architecture students,
+        have better averaged math performance, comparing with technical
+        students, which come after, and medical students, whom on average did
+        the worst performance. Generally speaking, medical students did a
+        better job in general knowledge, with larger variances.
+    \end{enumerate}
+    \begin{figure}[htp]
+        \centering
+        \includegraphics[width=0.5\textwidth]{apt_lang.pdf}
+        \includegraphics[width=0.5\textwidth]{math_gknol.pdf}
+        \caption{Pairwise scatterplots of students' performance in 4
+        subjects across 3 groups}
+        \label{fig:scatterplot}
+    \end{figure}
+
+    \section{}
+    \begin{verbatim}
+# Read dataset
+cars <- read.table("http://maitra.public.iastate.edu/stat579/datasets/cars.dat", header=T)
+
+attach(cars)
+
+# (why would stupid Americans keep resisting to switch to metric system?)
+# 1 mph = 1.4666667 ft/sec
+# 1 mile = 1.6093 km
+# 1 foot = 0.3048 m
+speed_ftps <- speed * 1.46667
+# Plot speed against distance (I guess this is the braking distance, though no 
+# such information is mentioned in the question).
+pdf('speed_vs_dist_ft.pdf')
+plot(x=speed_ftps, y=dist, 
+    xlab='Speed (feet/s)', ylab='Braking distance (feet)',
+    main='Plotting braking distance against speed')
+dev.off()
+
+# Unit conversion, again.
+speed_mps <- speed * 1.6093 * 1000 / 3600 
+dist_m <- dist * 0.3048
+
+detach(cars)
+
+pdf('speed_vs_dist_m.pdf')
+plot(x=speed_mps, y=dist_m, 
+    xlab='Speed (m/s)', ylab='Braking distance (meters)',
+    main='Plotting braking distance against speed')
+dev.off()
+    \end{verbatim}
+    Presented above is the R code for problem 2. 
+
+    Somehow, something is pretty vague with this dataset. The interpretation of
+    ``distance'' in this dataset is ambiguous. However, based on the
+    relationship between speed and distance demonstrated in two following
+    plots, we can conjecture that ``distance'' here refers to the braking
+    distance of car given a particular speed. 
+
+    \begin{figure}[htp]
+        \centering
+        \includegraphics[width=0.4\textwidth]{speed_vs_dist_ft.pdf}
+        \includegraphics[width=0.4\textwidth]{speed_vs_dist_m.pdf}
+        \caption{Vehicle stoppage distance versus vehicle speed}
+        \label{fig:dist_speed}
+    \end{figure}
+
+    If we assume that the ``distance'' on $Y$-axis of both plots
+    (Figure~\ref{fig:dist_speed}) above indeed
+    implies braking distance or vehicle stoppage distance, one simple
+    conclusion can be made, based on the plots, that there is a high
+    correlation between vehicle speed and its braking distance. It is not easy
+    to conclude, merely given these two plots, that if this relationship is
+    linear because of the variance observed on the plots. But in general, the
+    faster one vehicle goes, it takes longer distance to come to a complete
+    stop. Unit conversion from one system to another didn't change the
+    interpretation as they are proportionally scaled. 
+
+    \section{}
+    \begin{verbatim}
+# R program to problem 3 of HW1 / STAT 579
+
+# Convert temperature from Celsius scale to Fahrenheit
+temp.f <- pressure$temperature * 9 / 5 + 32
+pres.f <- data.frame(temperature=temp.f, pressure=pressure$pressure)
+
+# Linear regression
+fit <- lm(temperature ~ 0 + pressure, data=pres.f)
+print(summary(fit))
+
+# Plot temperature against pressure with fitted line
+pdf('temp_pres.pdf')
+plot(x=pres.f$pressure, y=pres.f$temperature)
+# Draw regression line
+abline(a=0, b=fit$coefficients[1])
+dev.off()
+
+pdf('fitted_residual.pdf')
+plot(x=fit$fitted.values, y=fit$residuals,
+    xlab='Fitted values', ylab='Residuals',
+    main='Residual plot of linear fit of temperature against pressure')
+dev.off()
+
+# A new model...
+pres.full <- data.frame(temperature=temp.f,
+    pres=pressure$pressure,
+    pres.sq=pressure$pressure^2,
+    pres.cubic=pressure$pressure^3)
+
+# Fit it with a MLR
+fit.full <- lm(temperature ~ pres + pres.sq + pres.cubic, data=pres.full)
+pdf('pres_mlr.pdf')
+plot(x=pres.f$pressure, y=pres.f$temperature, 
+    xlab='Pressure (mm/Hg)', ylab='Temperature (F)',
+    main='Fit water vapor temperature against pressures')
+lines(x=pres.full$pres, y=fit.full$fitted.values)
+dev.off()
+
+# Residual plot for MLR
+pdf('fitted_residuals_mlr.pdf')
+plot(x=fit.full$fitted.values, y=fit.full$residuals,
+    xlab='Fitted values', ylab='Residuals',
+    main='Residual plot of multiple linear regression of temperature against pressures')
+dev.off()
+    \end{verbatim}
+    R code to solve problem 3 is presented as above.
+
+    It is interesting though, that \verb=help(pressure)= suggests that this
+    dataset was recorded with \verb=temperature= as its independent variable.
+    But, it won't matter if we do the other way around since increment in
+    container pressure, given a certain amount of water vapor, will result in
+    increased temperature of water vapor. 
+
+    \begin{enumerate}
+    \item[(c)]
+    Plotting temperature against pressure (in Fahrenheit), we got
+    Figure~\ref{fig:res_plot}.
+    \begin{figure}[htp]
+        \centering
+        \begin{minipage}[b]{0.45\textwidth}
+        \includegraphics[width=0.9\textwidth]{temp_pres.pdf}
+        \caption{Water vapor temperature versus container pressure}
+        \label{fig:temp_pres}
+        \end{minipage}
+        \begin{minipage}[b]{0.45\textwidth}
+        \includegraphics[width=0.9\textwidth]{fitted_residual.pdf}
+        \caption{Residual plot of residuals versus fitted temperatures}
+        \label{fig:res_plot}
+        \end{minipage}
+    \end{figure}
+    \item[(d)]
+    Fit temperature versus pressure with a linear model, using 
+    \verb|lm(temperature ~ 0 + pressure, data=pres.f)| without the intercept
+    gave us,
+    \begin{verbatim}
+Call:
+lm(formula = temperature ~ 0 + pressure, data = pres.f)
+
+Residuals:
+   Min     1Q Median     3Q    Max 
+-300.2  122.0  247.1  345.2  394.7 
+
+Coefficients:
+         Estimate Std. Error t value Pr(>|t|)    
+pressure   1.2161     0.2516   4.834 0.000133 ***
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1 
+
+Residual standard error: 275.8 on 18 degrees of freedom
+Multiple R-squared: 0.5649, Adjusted R-squared: 0.5408 
+F-statistic: 23.37 on 1 and 18 DF,  p-value: 0.0001330 
+    \end{verbatim}
+    The line of fitted values was plotted on Figure~\ref{fig:temp_pres} as the
+    solid line. Adjusted $R^2 = 0.5408$ suggests that the linear relationship
+    is not prominent, which can be supported by merely looking at
+    Figure~\ref{fig:temp_pres}. The curve of temperature versus pressure, on
+    common sense, approximately follows a log-shaped curvature. 
+
+    In addition, because the temperature is measured on Fahrenheit scale, which
+    has a $32$ degree offset over Celcius degree, the linear regression has to
+    compesate for that offset. The linear relationship reported by linear
+    regression suggests that pressure increase, measured by one unit of mm
+    increase of mercury, results in about $1.2161$ degree (F) increase in water
+    vapor temperature. 
+    \item[(e)]
+    If we draw a residual plot (Figure~\ref{fig:res_plot}) of the linear regression in part (c), we can
+    clearly see that the simple linear regression didn't capture the
+    relationship between temperature and pressure nicely. For pressure values
+    smaller than 800mm of mercury, the linear regression tends to underestimate
+    the temperature (which can also be seen on Figure~\ref{fig:temp_pres}
+    because the fitted line is below the curvature for most of the values). And
+    after that point, the simple linear equation $T = 1.2146 P$ tends to
+    overestimate the temperature. Huge residuals that deviate from our fitted
+    values hint that the simple linear model is way from a good and practical
+    model.
+    \item[(g)]
+    We can fit temperature versus pressure with a polynomial model with a order
+    of 3, trying to interpret the resulting water vapor temperature as linear
+    combination of its pressure to the power of 3.
+    
+    Call \verb=summary(fit.full)=, we had,
+    \begin{verbatim}
+> summary(fit.full)
+Call:
+lm(formula = temperature ~ pres + pres.sq + pres.cubic, data = pres.full)
+
+Residuals:
+    Min      1Q  Median      3Q     Max 
+-181.39  -56.54   -2.31   72.88  121.93 
+
+Coefficients:
+              Estimate Std. Error t value Pr(>|t|)    
+(Intercept)  2.134e+02  2.966e+01   7.195  3.1e-06 ***
+pres         3.417e+00  7.671e-01   4.454 0.000464 ***
+pres.sq     -8.207e-03  2.826e-03  -2.904 0.010898 *  
+pres.cubic   5.842e-06  2.473e-06   2.362 0.032094 *  
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1 
+
+Residual standard error: 98.98 on 15 degrees of freedom
+Multiple R-squared: 0.8011, Adjusted R-squared: 0.7613 
+F-statistic: 20.14 on 3 and 15 DF,  p-value: 1.618e-05 
+    \end{verbatim}
+    This suggests that the intercept term and the pressure term are more
+    significant, comparing with the squared and cubed pressures. It is
+    reasonable, because the intercept tries to capture the offset introduced by
+    converting Celcius scale to Farenheit, and the pressure term, with a
+    coefficient $\beta_1 = 3.147$ is the major term that correspond to the
+    response in temerature as we vary the pressure. The squared and cubed terms
+    are mostly for compensating the over-fitted values, by the pressure term, of those points reside at the plateau of observed curvature.
+    \item[(h)]
+    Plot the fitted values in multiple linear regression on the graph we had in
+    (c) ended up with plot below (Figure~\ref{fig:pres_mlr}).
+    
+    Clearly, we have a better fit as the fitted values are closer to the
+    observed points, but it's not perfect. Because the intercept term we
+    introduced tend to way overestimate temperatures when pressure is close to
+    zero. 
+    \item[(g)]
+    \begin{figure}[htp]
+        \centering
+        \begin{minipage}[b]{0.45\textwidth}
+        \includegraphics[width=0.8\textwidth]{pres_mlr.pdf}
+        \caption{Water vapor temperature versus pressure with fitted values of
+        MLR}
+        \label{fig:pres_mlr}
+        \end{minipage}
+        \begin{minipage}[b]{0.45\textwidth}
+        \includegraphics[width=0.8\textwidth]{fitted_residuals_mlr.pdf}
+        \caption{Residual plots of the MLR}
+        \label{fig:res_plot_mlr}
+        \end{minipage}
+    \end{figure}
+    Again, a residual plot(Figure~\ref{fig:res_plot_mlr}) can demonstrates how our fit deviates from the data.
+    Huge residue variance can be observed at where fitted values are close to
+    $200$, because of the boasted intercept term elevates fitted temperatures
+    given even a small pressure. After that, the
+    residual shrinks, which corresponds to a better fit when range of pressure
+    getting beyond 0.
+    \end{enumerate}
+\end{document}

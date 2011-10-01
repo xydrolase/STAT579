@@ -1,0 +1,136 @@
+\SweaveOpts{eps=FALSE,pdf=TRUE}
+\section{}
+\begin{enumerate}[(a)]
+    \item
+    Read the datafile as a matrix,
+<<>>=
+d <- as.matrix(read.table("http://www.public.iastate.edu/~maitra/stat579/datasets/fbp-img.dat", header=F))
+@
+    \item So we can now plot this matrix using the \verb=image()= function with 256 gray-scales.
+<<fig=TRUE>>=
+image(d, col=gray((1:256)/256))
+@
+
+    So, looks like a brain PET image to me. I'm not pretty sure if the dark region is the lesion, but anyway, we have set up the standard image for following comparisons.
+    \item
+    We first try to implement some utility functions that make life easier, hopefully.
+<<>>=
+midpoints <- function(x){
+    return (apply(
+        matrix(x[c(1, rep(2:(length(x)-1), each=2), length(x))],
+            ncol=2, byrow=T),
+        MARGIN=1,
+        FUN=mean
+        ))
+}
+
+intervals <- function(x){
+    return (matrix(
+        x[c(1, rep(2:(length(x)-1), each=2), length(x))], 
+        ncol=2, byrow=T) + 
+        matrix(rep(c(1, -1), each=length(x)-1), ncol=2))
+}
+@
+    \verb=midpoints= is the function to calculate the midpoints given $k+1$ endpoints of $k$ bins. \verb=intervals= is another simple function that helps us to build matrices whose rows are interval of bins given the endpoints. 
+
+    Also, it is obvious that regardless of how we partition the range of values into $k$ bins, the underlying compress process is the same. So we build another function to compress a matrix into a $k$ gray-scale matrix, given the $k+1$ endpoints that can be generated in any approach.
+
+    I was trying to implement the \verb=compress()= function that handles any generic $k$, rather than a fixed $8$. 
+    To group the data points into $k$ bins, we need to find an elegent way of partitioning the values, given the intervals of the bins.
+    One natural approach I can easily come up with is to put back the $k+1$ end points of $k$ bins into the vector of data points, and sort the vector. Assume we can somehow mark or tag the end points, then we can easily parition the data points into bins, given the indices of the end points in the sorted vector. 
+
+    My little trick to mark these end points is to use complex numbers. The $k+1$ end points are tagged by adding an imaginary term, whereas normal data points only have a real component.
+    Once we sort the vector, we can easily assign the pixels that fall into particular bin, by choosing values with sorted orders within interval, with the corresponding mid-point value. 
+<<>>=
+compress <- function(m, endpoints){
+    mid.pts <- midpoints(endpoints)
+    # Tag the endpoints such that they can be easily identified in the sorted
+    # vector. And mix them into the data point for sorting.
+
+    m.dim <- dim(m)
+
+    full.pts <- c(endpoints + 1i, as.vector(m))
+    pts.order <- order(full.pts)
+    marked.indices <- which(Im(full.pts[pts.order]) > 0)
+
+    bins <- cbind(intervals(marked.indices), mid.pts)
+
+    # Compress the data into bins
+    apply(bins, 1, 
+        function(x){
+            full.pts[pts.order[seq(from=x[1], to=x[2])]] <<- x[3]
+        })
+    full.pts[pts.order[1]] <- mid.pts[1]
+
+    return (matrix(Re(full.pts[-(1:length(marked.indices))]),
+        nrow=m.dim[1], ncol=m.dim[2]))
+}
+@
+    The line \verb={full.pts[pts.order[1]] <- mid.pts[1]= is a small tweak that manually assigns the minimal midpoint to the minimal data point. One may refine this by constructing the \verb=bins= matrix with fixed $1$ and $N$ as the terminal indices. But since the tweak works, I'm kind of lazy to fix that.
+    
+    \begin{enumerate}[i.]
+    \item Okay, so, now we can get our work done. First, we group the data points into equally ranged intervals (bins). Again, define a wrapper function that eases life.
+<<>>=
+range.compress <- function(m, scale){
+    v <- as.vector(m)
+    end.pts <- seq(min(v), max(v), length.out=scale+1)
+    return (compress(m, end.pts))
+}
+@
+    And we can compare the compressed images with $4$, $8$ and $16$ grayscales side by side, along with the original image.
+<<fig=TRUE>>=
+par(mar=c(2.2, 2.2, 1.2, 1.2))
+layout(matrix(c(1,2,3,4), ncol=2, byrow=2))
+sapply(c(4,8,16), 
+    function(x){
+        image(range.compress(d, x), 
+        col=gray((1:256)/256),
+        main=paste(x, 'colors', sep=' '))
+    }) -> p 
+image(d, col=gray((1:256)/256), main="Original grayscale")
+@
+    \item For quantile bins, similarly, define another wrapper,
+<<>>=
+quantile.compress <- function(m, scale){
+    v <- as.vector(m)
+    end.pts <- quantile(v, probs=seq(from=0, to=1, length.out=scale+1))
+    return (compress(m, end.pts))
+}
+@
+    And generate the same plots group.
+<<fig=TRUE>>=
+par(mar=c(2.2, 2.2, 1.2, 1.2))
+layout(matrix(c(1,2,3,4), ncol=2, byrow=2))
+sapply(c(4,8,16), 
+    function(x){ 
+        image(quantile.compress(d, x),
+        col=gray((1:256)/256),
+        main=paste(x, 'colors', sep=' '))
+    }) -> p
+image(d, col=gray((1:256)/256), main="Original grayscale")
+@
+    \item
+    So, what have we got? Well, obviously we can easily discern something interesting here. Two compression methods have distinct patterns of compressed images. We will have some tradeoffs between the two methods, depends on what information we are interested in.
+
+    Some simple investigation will explain the huge difference between these two groupings, as we draw the histogram of the data points. 
+<<fig=TRUE>>=
+layout(c(1))
+hist(as.vector(d))
+@
+    There is a remarkable peak centered at 0, possibly due to significant background noises, which we can clearly identify on the plot shown in 2(b) as those fluffy curves radiate from the brain. 
+    
+    For bins with equal ranges, because the peak has very thin tails, we immediately eliminate many noises by having equal bin intervals. As we can see on plot presented in 2(c).i, even with only 4 grayscales, the contour and structures of the brain can be clearly identified. 
+    
+    Grouping by quantiles, however, can be seriously affected by the peak. Consequently, we use most of our bins to capture the data points among the peak, whereas the true meaningful values are left with little variations. This grouping ended up with complete loss of information within the brain. 
+
+    In fact, based on our exploration with the data, we can show that by simply removing the data points in the peak, we can greatly improve the resoution of the region in interest, in this particular case the brain.
+
+    We arbitrarily truncated the data points below 1000 to 0 (yeah, no brainer, just a trivial example), and plot the same matrix as image.
+<<fig=TRUE>>=
+d.truncated <- d
+d.truncated[d.truncated < 1000] <- 0
+image(d.truncated, col=gray((1:256)/256))
+@
+    Comparing the plot above with what we got in 2(b), clearly we can see more details in the brain, which will hopefully help us to make more accurate diagnosis.
+    \end{enumerate}
+\end{enumerate}
