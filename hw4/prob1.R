@@ -57,7 +57,7 @@ array.means.scaled <- standardize(array.means)
 
 #which will be replicated along the z-axis twenty fold
 arab.means.replicated <- array(
-    rep(as.vector(arab.means.scaled), times=20),
+    arab.means.scaled,
     dim=c(dim(arab.means.scaled)[1], TIMEPOINTS, 20))
 
 # Now replicate the 20x11 matrix 28810 folds along x-axis.
