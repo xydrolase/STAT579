@@ -1,0 +1,36 @@
+\documentclass{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath, amssymb}
+\usepackage{enumerate}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{verbatim}
+\usepackage{/usr/share/R/share/texmf/tex/latex/Sweave}
+\SweaveOpts{pdf=TRUE,eps=FALSE}
+
+\pagestyle{fancy}
+\fancyhead[L]{STAT 579 HW4}
+\fancyhead[R]{Xin Yin}
+\titleformat{\section}{\em\Large} {$\dagger$ \thesection .}{10pt}{}
+
+\begin{document}
+    \section{}
+    \begin{enumerate}[(a)]
+    \item
+<<>>=
+arab.array <- read.csv("http://www.public.iastate.edu/~maitra/stat579/datasets/diurnaldata.csv", header=T)
+@
+    \item
+<<>>=
+arab.expr.lvl <- as.matrix(arab.array[,2:23])
+
+# Convert the 22810x22 matrix to a 22810x11x2 array 
+arab.replicates <- array(arab.expr.lvl, 
+    c(dim(arab.expr.lvl)[1], TIMEPOINTS, 2))
+
+
+# Calculate the mean abundance level across two replicates
+arab.means <- apply(arab.replicates, MARGIN=c(1,2), FUN=mean)
+@
+    \end{enumerate}
+\end{document}

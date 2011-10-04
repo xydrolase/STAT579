@@ -56,7 +56,8 @@ array.means.scaled <- standardize(array.means)
 #  +---------------> y = 11
 
 #which will be replicated along the z-axis twenty fold
-arab.means.replicated <- array(as.vector(array.means.scaled), 
+arab.means.replicated <- array(
+    rep(as.vector(arab.means.scaled), times=20),
     dim=c(dim(arab.means.scaled)[1], TIMEPOINTS, 20))
 
 # Now replicate the 20x11 matrix 28810 folds along x-axis.
@@ -123,5 +124,11 @@ euclid.dist <- apply(euclid.dist.comp, MARGIN=c(1, 3), FUN=sum)
 closest.mean <- apply(euclid.dist, MARGIN=1,
     function(x) order(x)[1])
 
-closest.tbl <- table(closest.mean)
+closest.tbl <- data.frame(table(closest.mean))
+names(closest.tbl) <- c('means', 'freq')
 print(closest.tbl)
+
+library(ggplot2)
+pie <- ggplot(closest.tbl, 
+    aes(x=factor(1), y=freq, fill=factor(means))) + geom_bar(width=1)
+pie + coord_polar(theta='y')
