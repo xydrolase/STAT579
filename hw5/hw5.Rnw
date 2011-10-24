@@ -1,0 +1,132 @@
+\documentclass{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath, amssymb}
+\usepackage{enumerate}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{verbatim}
+\usepackage{/usr/share/R/share/texmf/tex/latex/Sweave}
+\SweaveOpts{pdf=TRUE,eps=FALSE}
+
+\pagestyle{fancy}
+\fancyhead[L]{STAT 579 HW4}
+\fancyhead[R]{Xin Yin}
+\titleformat{\section}{\em\Large} {$\dagger$ \thesection .}{10pt}{}
+
+\begin{document}
+    \section{}
+    Load the \verb=MASS= library and prepare the \verb=mycars= matrix.
+<<>>=
+library(MASS)
+mycars <- as.matrix(Cars93[, c('Min.Price', 'Max.Price', 
+                       'MPG.city', 'MPG.highway', 
+                       'EngineSize', 'Length', 'Weight')])
+@
+    \begin{enumerate}[(a)]
+        \item Find the mean for each feature in interest.
+<<>>=
+car.mean <- apply(mycars, 2, mean)
+@
+        \item And standard error,
+<<>>=
+n <- nrow(mycars)
+car.se <- apply(mycars, 2, sd)/sqrt(n)
+@
+        \item And, finally, the 99\% confidence interval, assuming the observations for every feature are normally distibutions (which is not true).
+<<>>=
+car.ci <- rbind(car.mean - car.se * qnorm(0.99), 
+                car.mean + car.se * qnorm(0.99))
+@
+    \end{enumerate}
+    Then we can create the list for car statistics.
+<<>>=
+(cars.stats <- list(Cars.Means=car.mean,
+                   Cars.Std.Errors=car.se,
+                   Cars.CI.99=car.ci))
+@
+    \section{}
+    \begin{enumerate}[(a)]
+        \item Find the mean per captica income using the \verb=Incom= column from \verb=state.x77=.
+<<>>=
+(mean.income <- tapply(state.x77[, 'Income'], 
+                      INDEX=state.region,
+                      FUN=mean))
+@
+        \item Now find the maximum illiteracy rates within each division,
+<<>>=
+(max.illiteracy.rate <- tapply(state.x77[, 'Illiteracy'],
+                              INDEX=state.division,
+                              FUN=max))
+@
+        \item Count the number of states in each region.
+<<>>=
+(count.state.region <- tapply(rep(1, times=nrow(state.x77)), 
+                             INDEX=state.region,
+                             FUN=sum))
+@
+        \item Count the names in each division. We should be pretty safe to repeat what we did in (c), but just to be meticulous, we can execute,
+<<>>=
+(count.state.division <- tapply(factor(rownames(state.x77)),
+                                INDEX=state.division,
+                                FUN=function(x)length(unique(x))))
+@
+        \item Finally, we calculate the median of high school graduation rate across each \verb=divison x size= combination.
+<<>>=
+state.size <- cut(state.x77[, 'Population'], 
+                  breaks=c(0, 2000, 10000, Inf),
+                  labels=c('Small', 'Medium', 'Large'))
+
+state.group <- factor(paste(state.region, state.size, sep='/'))
+
+(med.hs.grad <- tapply(state.x77[, "HS Grad"],
+                      INDEX=state.group,
+                      FUN=median))
+@
+    \end{enumerate}
+    \section{}
+    Given that,
+    \[
+    \rho = \frac{Cov(X_i, X_j)}{\sqrt{Var(X_i)Var(X_j)}},
+    \]
+    and that,
+    \[
+    [\sigma_1, \dots, \sigma_n] = diag(\Sigma),
+    \]
+    to get the correlation matrix, we could first divide each row $i$ of the variance-covariance matrix with
+    corresponding $\sigma_i$, and divide each column $j$ with corresponding $\sigma_j$.
+
+    Define a function in R to perform this task,
+<<>>=
+cor.matrix <- function(x){
+    cov.m <- cov(x)
+    xx.sd <- sqrt(diag(cov(x)))
+    return(sweep(sweep(cov.m, MARGIN=1,
+                 STATS=xx.sd, FUN='/'),
+                 MARGIN=2, STATS=xx.sd,
+                 FUN='/'))
+}
+@
+    where \verb=x= of function \verb=cor.matrix()= is the matrix sought to find its correlation matrix.
+
+    Now apply our function on an arbitrary x, and check if it works as expected.
+<<>>=
+x <- matrix(rnorm(16), ncol=4)
+all.equal(cor(x), cor.matrix(x))
+@
+
+    Bingo.
+    \section{}
+    \begin{enumerate}[(a)]
+        \item Apply \verb=mad= function onto observations of every car feature we extracted earlier.
+<<>>=
+(cars.mad <- apply(mycars, 2, mad))
+@
+        \item Now compute our own version according to definition of MAD.
+<<>>=
+(cars.mad.alt <- apply(mycars, 2, 
+                       function(x) 1.4826 * median(abs(x-median(x)))))
+all.equal(cars.mad.alt, cars.mad)
+@
+        So, yes, they are identical.
+    \end{enumerate}
+\end{document}
