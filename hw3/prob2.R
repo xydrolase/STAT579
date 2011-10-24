@@ -47,7 +47,7 @@ compress <- function(m, endpoints){
     # Compress the data into bins
     apply(bins, 1, 
         function(x){
-            data.pts[x[1] <= data.pts & data.pts <= x[2]] <<- x[3]
+            data.pts[x[1] < data.pts & data.pts <= x[2]] <<- x[3]
         })
 
     return (matrix(data.pts, nrow=m.dim[1], ncol=m.dim[2]))
