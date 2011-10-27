@@ -1,0 +1,203 @@
+\documentclass{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath, amssymb}
+\usepackage{enumerate}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{verbatim}
+\usepackage{/usr/share/R/share/texmf/tex/latex/Sweave}
+\SweaveOpts{pdf=TRUE,eps=FALSE}
+
+\pagestyle{fancy}
+\fancyhead[L]{STAT 579 HW6}
+\fancyhead[R]{Xin Yin}
+\titleformat{\section}{\em\Large} {$\dagger$ \thesection .}{10pt}{}
+
+\begin{document}
+\section{Exercises 2/3/4}
+To calculate $h(x, n) = \sum_{i=0}^n x^i = 1 + x + \dots + x^n$ explicitly with a \verb=for= loop, we can first start with an obvious approach.
+<<>>=
+h.naive <- function(x, n){
+    x.sum <- 0
+    for (i in 0:n){
+        x.sum <- x.sum + x^i
+    }
+    return (x.sum)
+}
+@
+Let's check if this will work out,
+<<>>=
+c(h.naive(0.3, 55), h.naive(6.6, 8))
+@
+Well, it turns out this is not fun at all. It turns out that this sum can be computed in a recursive manner, namely, 
+\[
+h(x, n) = h(x, n-1)\cdot x + 1
+\]
+Notice that because $h(x, n-1)$ is a constant, this is a linear transform that we can write down in a matrix form as,
+\[
+h(x, n) = \left(
+    \begin{array}{cc}
+        x & 1 \\
+        0 & 1
+    \end{array}
+    \right)
+    \left (
+    \begin{array}{c}
+        h(x, n-1) \\
+        1
+    \end{array}
+    \right )
+\]
+
+So,
+\[
+h(x, n) = \left(
+    \begin{array}{cc}
+        x & 1 \\
+        0 & 1
+    \end{array}
+    \right)^{(n)}
+    \left(
+    \begin{array}{c}
+        1 \\
+        1
+    \end{array}
+    \right).
+\]
+
+Unfortunately, \verb=R= has no built-in function to calculate a matrix to the power of $n$. On the other side of the coin, we can then implement this power of a matrix using \verb=for= loop in comply with the requirement of exercise 2.
+<<>>=
+h.matrix <- function(x, n){
+    ltf.m <- matrix(c(x, 0, 1, 1), ncol=2) -> m
+    v <- c(1, 1)
+    for (i in 2:n){
+        m <- ltf.m %*% m
+    }
+    return (m %*% v)
+}
+c(h.matrix(0.3, 55)[1], h.matrix(6.6, 8)[1])
+@
+
+Now we jump to exercise 4. First we rewrite our \verb=naive= version of $h(x, n)$ using \verb=while= loop.
+<<>>=
+h.naive.w <- function(x, n){
+    x.sum <- 0
+    while (n >=0){
+        x.sum <- x.sum + x^n
+        n <- n - 1
+    }
+    return (x.sum)
+}
+c(h.naive.w(0.3, 55), h.naive.w(6.6, 8))
+@
+
+Obviously we can rewrite the \verb=h.matrix= using \verb=while= loop as well, but why bother?
+
+Of course, they are all kinds of buzz about now inefficient a \verb=for= loop is in \verb=R=. So, let's consider other implementations of $h(x, n)$, and compare the speed of all versions of $h(n, x)$ later.
+First we can use the almighty \verb=apply= family to replace the notorious \verb=for= loop,
+<<>>=
+h.apply <- function(x, n) return (1+sum(sapply(1:n, function(i) x^i)))
+c(h.apply(0.3, 55), h.apply(6.6, 8))
+@
+
+We can also improve the speed of our sluggish implementation of power of a matrix using some well optimizied package,
+<<>>=
+library(expm)
+h.matrix.alt <- function(x, n){
+    ltf.m <- matrix(c(x, 0, 1, 1), ncol=2)
+    v <- c(1, 1)
+    return (ltf.m %^% n %*% v)
+}
+c(h.matrix.alt(0.3, 55)[1], h.matrix.alt(6.6, 8)[1])
+@
+
+Let's do some benchmarking at this point,
+<<>>=
+system.time(replicate(10000, h.naive(0.3, 55)))
+system.time(replicate(10000, h.naive.w(0.3, 55)))
+system.time(replicate(10000, h.apply(0.3, 55)))
+system.time(replicate(10000, h.matrix(0.3, 55)))
+system.time(replicate(10000, h.matrix.alt(0.3, 55)))
+@
+
+So, \verb=for= loop is, yes, slow. \verb=while= is even more horrible in speed. Interestingly, using \verb=sapply= to calculate $h(x,n)$ is super inefficient because of the extra overhead of function calls (well,function calls are expensive). The matrix calculation with \verb=for= loop is even a little bit faster than the \verb=naive= one. It is kind of like a dynamic programming algorithm, that by doing matrix multiplication, we avoid calculating $x^m$ directly, which is also very costly.
+
+Finally, the matrix implementation using the \verb=expm= package is pretty efficient because we remove all the code that can be laggy in \verb=R=. But is this the most elegant and most efficient approach? Let's try something else, that without any \verb=for= loop and avoid repeatative function calls,
+<<>>=
+h.cumprod <- function(x, n) 1 + sum(cumprod(rep(x, n)))
+c(h.cumprod(0.3, 55), h.cumprod(6.6, 8))
+system.time(replicate(10000, h.cumprod(0.3, 55)))
+@
+
+Yes, \verb=R= does replication fast, calculates sum fast, and the \verb=cumprod= turns out to be very efficient. But one may still argue there's better and more elegant functions in \verb=R= that handles this problem perfectly well. Do you have any idea?
+
+\section{Exercise 10}
+Since this exercise is dumb and boring, let's do it fast,
+<<>>=
+v.min <- function(x){
+    x.min <- x[1]
+    for (i in 2:length(x)){
+        if (x.min < x[i]){
+            x.min <- x[i]
+        }
+    }
+    return (x.min)
+}
+@
+It may not be robust to some weird \verb=x= that one may feed this function. But who cares? 
+
+\section{Exercise 11}
+This function is exactly the ``merge'' step in a merge sort algorithm. 
+<<>>=
+merge <- function(x, y){
+    m <- rep(0, length(x) + length(y))
+    i <- 1 -> j
+
+}
+@
+
+\section{Exercise 12}
+<<fig=TRUE>>=
+craps <- function(n){
+    results <- matrix(rep(0, 2*n), nrow=2)
+    # first round
+    dice.sum <- replicate(n, sum(ceiling(6*runif(2))))
+    win.idx <- which(dice.sum %in% c(7, 11))
+    results[, win.idx]  <- c(1, 1)
+    
+    remain <- (1:n)[-win.idx]
+    prev.round <- dice.sum[-win.idx]
+    round <- 2
+    while(length(remain)){
+        dice.sum <- replicate(length(remain), sum(ceiling(6*runif(2))))
+        win.idx <- dice.sum == prev.round
+        results[, remain[win.idx]] <- c(1, round)
+        lose.idx <- dice.sum %in% c(7, 11)
+        results[, remain[lose.idx]] <- c(0, round)
+        
+        # update vector
+        remain <- remain[!(win.idx | lose.idx)]
+        prev.round <- dice.sum[!(win.idx | lose.idx)]
+
+        round <- round + 1
+    }
+    return (results)
+}
+
+sim.craps <- data.frame(t(craps(10000)))
+names(sim.craps) <- c('outcome', 'round')
+sim.craps$outcome <- factor(sim.craps$outcome, levels=c(0, 1), labels=c('L', 'W'))
+table(sim.craps$outcome)
+hist(sim.craps$round, main="Histogram of rounds of gameplay")
+@
+
+\section{Exercise 13}
+<<fig=TRUE>>=
+t <- seq(0, 10, length.out=500)
+phi <- 2*pi*t
+r <- sqrt(t)
+plot(r*cos(phi), r*sin(phi), typ='l', xlab=expression('x(t)'),
+     ylab=expression('y(t)'))
+@
+
+\end{document}
