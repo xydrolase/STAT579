@@ -120,7 +120,24 @@ system.time(replicate(10000, h.matrix(0.3, 55)))
 system.time(replicate(10000, h.matrix.alt(0.3, 55)))
 @
 
-So, \verb=for= loop is, yes, slow. \verb=while= is even more horrible in speed. Interestingly, using \verb=sapply= to calculate $h(x,n)$ is super inefficient because of the extra overhead of function calls (well,function calls are expensive). The matrix calculation with \verb=for= loop is even a little bit faster than the \verb=naive= one. It is kind of like a dynamic programming algorithm, that by doing matrix multiplication, we avoid calculating $x^m$ directly, which is also very costly.
+So, \verb=for= loop is, yes, slow. \verb=while= is even more horrible in speed. Interestingly, using \verb=sapply= to calculate $h(x,n)$ is super inefficient because of the extra overhead of function calls (well,function calls are expensive). The matrix calculation with \verb=for= loop is even a little bit faster than the \verb=naive= one. So, is it because the matrix calculation is more efficient than loop, or is it because to compute $x^i$ at every iteration of $i$ is computationally costly? 
+
+To test this, we can rewrite the naive for loop version in order to avoid recomputing $x^i$ at each given $i$.
+
+<<>>=
+h.naive.cum <- function(x, n){
+    x.sum <- x.n <- 1
+    for (i in 1:n){
+        x.n <- x.n * x
+        x.sum <- x.sum + x.n
+    }
+    return (x.sum)
+}
+c(h.naive.cum(0.3, 55)[1], h.naive.cum(6.6, 8)[1])
+system.time(replicate(10000, h.naive.cum(0.3, 55)))
+@
+
+As we can see, the improvement is negligible, if any. So, yes, evil \verb=for= loop is sloooooow. 
 
 Finally, the matrix implementation using the \verb=expm= package is pretty efficient because we remove all the code that can be laggy in \verb=R=. But is this the most elegant and most efficient approach? Let's try something else, that without any \verb=for= loop and avoid repeatative function calls,
 <<>>=
@@ -129,7 +146,15 @@ c(h.cumprod(0.3, 55), h.cumprod(6.6, 8))
 system.time(replicate(10000, h.cumprod(0.3, 55)))
 @
 
-Yes, \verb=R= does replication fast, calculates sum fast, and the \verb=cumprod= turns out to be very efficient. But one may still argue there's better and more elegant functions in \verb=R= that handles this problem perfectly well. Do you have any idea?
+Yes, \verb=R= does replication fast, calculates sum fast, and the \verb=cumprod= turns out to be very efficient.
+
+For functional programming kids, here comes another snippet of code.
+<<>>=
+h.fp <- function(x, n) Reduce('+', (Reduce('*', rep(x, n))))
+c(h.fp(0.3, 55), h.fp(6.6, 8))
+system.time(replicate(10000, h.fp(0.3, 55)))
+@
+If this suggests anything, it is simply that always think in R when working with R.
 
 \section{Exercise 10}
 Since this exercise is dumb and boring, let's do it fast,
@@ -146,18 +171,56 @@ v.min <- function(x){
 @
 It may not be robust to some weird \verb=x= that one may feed this function. But who cares? 
 
+Test drive here,
+<<>>=
+(xr <- ceiling(runif(20)*100))
+c(v.min(xr), min(xr))
+@
+
 \section{Exercise 11}
 This function is exactly the ``merge'' step in a merge sort algorithm. 
 <<>>=
 merge <- function(x, y){
-    m <- rep(0, length(x) + length(y))
-    i <- 1 -> j
+    lx <- length(x)
+    ly <- length(y)
+    lm <- lx + ly
+    m <- rep(0, lm)
 
+    i <- 1 -> j
+    for (k in 1:length(m)){
+        if (x[i] < y[j]){
+            m[k] <- x[i]
+            i <- i + 1
+        } else {
+            m[k] <- y[j]
+            j <- j + 1
+        }
+
+        if (i > lx){
+            m[k:lm] <- y[j:ly]
+            break
+        } 
+        if (j >ly){
+            m[k:lm] <- x[i:lx]
+            break
+        }
+    }
+
+    return (m)
 }
+@
+Let's try this out,
+<<>>=
+x <- rpois(8, lambda=8)
+y <- rpois(12, lambda=6)
+sort(c(x, y))
+merge(x, y)
+merge(x, y) == sort(c(x, y))
 @
 
 \section{Exercise 12}
-<<fig=TRUE>>=
+We can implement a function named \verb=craps= to simulate this (horrible) game for any arbitrary time. 
+<<>>=
 craps <- function(n){
     results <- matrix(rep(0, 2*n), nrow=2)
     # first round
@@ -166,32 +229,42 @@ craps <- function(n){
     results[, win.idx]  <- c(1, 1)
     
     remain <- (1:n)[-win.idx]
-    prev.round <- dice.sum[-win.idx]
+    first.round <- dice.sum[-win.idx]
     round <- 2
     while(length(remain)){
         dice.sum <- replicate(length(remain), sum(ceiling(6*runif(2))))
-        win.idx <- dice.sum == prev.round
+        win.idx <- dice.sum == first.round
         results[, remain[win.idx]] <- c(1, round)
         lose.idx <- dice.sum %in% c(7, 11)
         results[, remain[lose.idx]] <- c(0, round)
         
         # update vector
         remain <- remain[!(win.idx | lose.idx)]
-        prev.round <- dice.sum[!(win.idx | lose.idx)]
+        first.round <- first.round[!(win.idx | lose.idx)]
 
         round <- round + 1
     }
     return (results)
 }
+@
 
+So now let's simulate playing this game for 10000 times.
+<<>>=
 sim.craps <- data.frame(t(craps(10000)))
 names(sim.craps) <- c('outcome', 'round')
 sim.craps$outcome <- factor(sim.craps$outcome, levels=c(0, 1), labels=c('L', 'W'))
+@
+And how many times do we win?
+<<>>=
 table(sim.craps$outcome)
+@
+It slighly more likely to lose the the game. And we can also plot the histogram of how many rounds we need to either claim a win or lost.
+<<fig=TRUE>>=
 hist(sim.craps$round, main="Histogram of rounds of gameplay")
 @
 
 \section{Exercise 13}
+Let's plot this mosquito coil, shall we?
 <<fig=TRUE>>=
 t <- seq(0, 10, length.out=500)
 phi <- 2*pi*t
@@ -199,5 +272,4 @@ r <- sqrt(t)
 plot(r*cos(phi), r*sin(phi), typ='l', xlab=expression('x(t)'),
      ylab=expression('y(t)'))
 @
-
 \end{document}
