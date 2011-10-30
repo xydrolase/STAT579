@@ -150,7 +150,7 @@ Yes, \verb=R= does replication fast, calculates sum fast, and the \verb=cumprod=
 
 For functional programming kids, here comes another snippet of code.
 <<>>=
-h.fp <- function(x, n) Reduce('+', (Reduce('*', rep(x, n), accumulate=T)))
+h.fp <- function(x, n) 1+Reduce('+', (Reduce('*', rep(x, n), accumulate=T)))
 c(h.fp(0.3, 55), h.fp(6.6, 8))
 system.time(replicate(10000, h.fp(0.3, 55)))
 @
@@ -162,7 +162,7 @@ Since this exercise is dumb and boring, let's do it fast,
 v.min <- function(x){
     x.min <- x[1]
     for (i in 2:length(x)){
-        if (x.min < x[i]){
+        if (x[i] < x.min){
             x.min <- x[i]
         }
     }
@@ -215,7 +215,7 @@ x <- sort(rpois(8, lambda=9))
 y <- sort(rpois(12, lambda=6))
 sort(c(x, y))
 merge(x, y)
-merge(x, y) == sort(c(x, y))
+all(merge(x, y) == sort(c(x, y)))
 @
 
 \section{Exercise 12}
