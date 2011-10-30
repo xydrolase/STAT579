@@ -35,34 +35,28 @@ h(x, n) = h(x, n-1)\cdot x + 1
 \]
 Notice that because $h(x, n-1)$ is a constant, this is a linear transform that we can write down in a matrix form as,
 \[
-h(x, n) = \left(
-    \begin{array}{cc}
+h(x, n) = 
+    \begin{pmatrix}
         x & 1 \\
         0 & 1
-    \end{array}
-    \right)
-    \left (
-    \begin{array}{c}
+    \end{pmatrix}
+    \begin{pmatrix}
         h(x, n-1) \\
         1
-    \end{array}
-    \right )
+    \end{pmatrix}
 \]
 
 So,
 \[
-h(x, n) = \left(
-    \begin{array}{cc}
+h(x, n) = 
+    \begin{pmatrix}
         x & 1 \\
         0 & 1
-    \end{array}
-    \right)^{(n)}
-    \left(
-    \begin{array}{c}
+    \end{pmatrix}^{(n)}
+    \begin{pmatrix}
         1 \\
         1
-    \end{array}
-    \right).
+    \end{pmatrix}.
 \]
 
 Unfortunately, \verb=R= has no built-in function to calculate a matrix to the power of $n$. On the other side of the coin, we can then implement this power of a matrix using \verb=for= loop in comply with the requirement of exercise 2.
@@ -145,10 +139,10 @@ h.cumprod <- function(x, n) 1 + sum(cumprod(rep(x, n)))
 c(h.cumprod(0.3, 55), h.cumprod(6.6, 8))
 system.time(replicate(10000, h.cumprod(0.3, 55)))
 @
-
 Yes, \verb=R= does replication fast, calculates sum fast, and the \verb=cumprod= turns out to be very efficient.
 
-For functional programming kids, here comes another snippet of code.
+If you turn out to be a functional programming kid, you may also write this
+snippet of code to do the same job. So, no \verb=for=, no \verb=while=, looks clean. What's the performance then?
 <<>>=
 h.fp <- function(x, n) 1+Reduce('+', (Reduce('*', rep(x, n), accumulate=T)))
 c(h.fp(0.3, 55), h.fp(6.6, 8))
@@ -252,15 +246,15 @@ So now let's simulate playing this game for 10000 times.
 <<>>=
 sim.craps <- data.frame(t(craps(10000)))
 names(sim.craps) <- c('outcome', 'round')
-sim.craps$outcome <- factor(sim.craps$outcome, levels=c(0, 1), labels=c('L', 'W'))
+sim.craps[, 'outcome'] <- factor(sim.craps[, 'outcome'], levels=c(0, 1), labels=c('L', 'W'))
 @
 And how many times do we win?
 <<>>=
-table(sim.craps$outcome)
+table(sim.craps[, 'outcome'])
 @
 It slighly more likely to lose the the game. And we can also plot the histogram of how many rounds we need to either claim a win or lost.
 <<fig=TRUE>>=
-hist(sim.craps$round, main="Histogram of rounds of gameplay")
+hist(sim.craps[, 'round'], main="Histogram of rounds of gameplay")
 @
 
 \section{Exercise 13}
