@@ -1,0 +1,179 @@
+\documentclass{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath, amssymb}
+\usepackage{enumerate}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{verbatim}
+\usepackage{/usr/share/R/share/texmf/tex/latex/Sweave}
+
+
+\pagestyle{fancy}
+\fancyhead[L]{STAT 579 HW7}
+\fancyhead[R]{Xin Yin}
+\titleformat{\section}{\em\Large} {$\dagger$ \thesection .}{10pt}{}
+
+\begin{document}
+\section{}
+\begin{enumerate}[(a)]
+    \item 
+\begin{Schunk}
+\begin{Sinput}
+> vote <- read.table("http://maitra.public.iastate.edu/stat579/datasets/FL2000vote.dat", 
++     header = T)
+> pres.candidates <- c("GORE", "BUSH", "BUCHANAN", "NADER")
+> senate.candidates <- c("NELSON", "MCCOLLUM", "LOGAN")
+> pres.vote <- apply(vote[, pres.candidates], 1, sum)
+> senate.vote <- apply(vote[, senate.candidates], 1, sum)
+> n.county <- nrow(vote)
+> plot(x = 1:n.county, y = pres.vote, type = "n", xaxt = "n", xlab = "", 
++     ylab = "Votes")
+> axis(side = 1, las = 2, at = 1:67, labels = rownames(vote), cex.axis = 0.6)
+> text(x = (1:n.county) - 0.2, y = pres.vote, labels = rep("P", 
++     n.county), col = 35, cex = 0.8)
+> text(x = (1:n.county) + 0.2, y = senate.vote, labels = rep("S", 
++     n.county), col = 70, cex = 0.8)
+> legend(x = "topright", pch = c("P", "S"), col = c(35, 70), legend = c("President", 
++     "Senate"))
+\end{Sinput}
+\end{Schunk}
+\includegraphics{hw7-001}
+        So, yes, we can see at least 1 county that has more votes for senate candidates than presidential candidates. Actually, if we check the actual values rather than directly inspecting the plot, we can see that there are a few counties with more senate votes.
+    \item The piechart for Palm Beach County is,
+\begin{Schunk}
+\begin{Sinput}
+> pb.subscript <- which(rownames(vote) == "PALM.BEACH")
+> pb.votes <- vote["PALM.BEACH", pres.candidates]
+> pie(as.numeric(pb.votes), labels = (paste(names(pb.votes), pb.votes)), 
++     radius = -0.75, main = "Pie chart of presidential candidates votes at Palm Beach County")
+\end{Sinput}
+\end{Schunk}
+\includegraphics{hw7-002}
+
+        Well, politics is always a game of power.
+    \item In order to see if the butterfly ballot indeed misled many voters to accidentally vote for Buchanan, we can plot the proportions of votes for Buchanan for all counties. The error bars indicate the standard error the proportions, and are truncated at 0, as proportions can't be negative. A horizontal line is drawn to highlight the proportion of votes for Buchanan in Palm County.
+\begin{Schunk}
+\begin{Sinput}
+> bn.prop <- vote[, "BUCHANAN"]/pres.vote * 100
+> bn.se <- sqrt(bn.prop * (100 - bn.prop)/length(bn.prop))
+> bn.lb <- bn.prop - bn.se
+> bn.ub <- bn.prop + bn.se
+> bn.lb[bn.lb < 0] <- 0
+> bn.x <- 1:length(bn.prop)
+> plot(bn.prop, pch = 20, xaxt = "n", xlab = "", ylim = c(0, max(bn.prop + 
++     bn.se)), ylab = "Proportions (in percentage)", main = "County-wide vote proportions for Buchanan")
+> axis(side = 1, at = bn.x, las = 2, labels = rownames(vote), cex.axis = 0.6)
+> segments(1, bn.prop[pb.subscript], length(bn.prop), bn.prop[pb.subscript])
+> segments(bn.x, bn.lb, bn.x, bn.ub, col = "gray", lty = 2)
+> segments(bn.x - 0.5, bn.lb, bn.x + 0.5, bn.lb, col = "gray")
+> segments(bn.x - 0.5, bn.ub, bn.x + 0.5, bn.ub, col = "gray")
+\end{Sinput}
+\end{Schunk}
+\includegraphics{hw7-003}
+
+    We can hardly tell if this proportion was really inflated due to the butterfly ballot merely based on the plot, as this proportion doesn't look like an outlier on this plot. But the proportion in Palm Beach county is well above the mean. 
+
+    If we look at the number of votes alone for Buchanan at Palm Beach County, the number does look suspicious. But take the population base into adjustment, the votes were not excessively large. Former president Bush's campaign, back to 2000, claimed that this was not a bloated number (and of course he will claim so). While Buchanan's group themselves acknowledged the votes as an error.
+    
+    I guess if you are running for president as independent candidate, you must weigh your limited resourses to counties that relatively seem promising for securing votes. After all, Buchanan won a very small porprotion of votes in every county, and if no background information is taken into consideration, the proportion in Palm Beach county can be explained as due to variation, and it looks completely normal to me. I have no further assumptions on this to make.
+    \item To visualize the votes for all four presidential candidates on the same plot, we used the strategy described in the homework questions. 
+        I manually crafted a legend to show the sizes and colors of quantiles of votes for Buchanan and Nader.
+\begin{Schunk}
+\begin{Sinput}
+> viz.4d <- function(x, y, cex, col, cex.factor = 5, xlab, ylab, 
++     cex.lab, col.lab) {
++     cex.scale <- cex/max(cex)
++     col.scale <- (col - min(col))/(max(col) - min(col))
++     col.rgb <- rgb(col.scale, 0, 1 - col.scale)
++     par(mar = c(5.1, 4.1, 4.1, 7.1))
++     plot(x = x, y = y, pch = 20, cex = cex.scale * cex.factor, 
++         col = col.rgb, xlab = xlab, ylab = ylab)
++     xy.range <- par("usr")
++     xy.frac <- par("plt")
++     x.scale <- (xy.range[2] - xy.range[1])/(xy.frac[2] - xy.frac[1])
++     y.scale <- (xy.range[4] - xy.range[3])/(xy.frac[4] - xy.frac[3])
++     cex.q <- quantile(cex.scale)
++     col.q <- quantile(col.scale)
++     col.l <- rgb(col.q, 0, 1 - col.q)
++     x.lgd <- rep(xy.range[2] + (1 - xy.frac[2]) * 0.25 * x.scale, 
++         5)
++     y.lgd <- xy.range[4] - (1:5)/20 * y.scale
++     points(x.lgd, y.lgd, pch = 20, xpd = T, cex = cex.q * cex.factor, 
++         col = col.l)
++     x.lbl <- rep(xy.range[2] + (1 - xy.frac[2]) * 0.5 * x.scale, 
++         5)
++     text(x.lbl[1], xy.range[4], col = "gray", xpd = T, adj = 1, 
++         cex = 0.65, labels = paste(cex.lab, col.lab, sep = "\n"))
++     text(x.lbl, y.lgd, adj = 1, labels = paste(round(quantile(cex), 
++         2), round(quantile(col), 2), sep = "\n"), xpd = T, cex = 0.6)
++ }
+> viz.4d(x = vote[, "GORE"], y = vote[, "BUSH"], cex = vote[, "BUCHANAN"], 
++     col = vote[, "NADER"]/pres.vote, ylab = "Bush", xlab = "Gore", 
++     cex.lab = "Buchanan", col.lab = "Nader", cex.factor = 8)
+\end{Sinput}
+\end{Schunk}
+\includegraphics{hw7-004}
+
+    Generally speaking, since we are plotting the county-wide votes, the number of votes secured by Bush and Gore should be correlated as shown in the plot. The more population base a county has, more votes were registered for all candidates.
+
+    It is however in this plot that we can see the impact of the butterfly ballot. The votes for Buchanan at Palm Beach County is largely disproportional according to the number of voters. And now it seems more evident that Buchanan's votes was more likely due to error in ballot design.
+
+    Other than this obvious data point, we can also identify a negative correlation between votes for Buchanan and Nader, as these two were competing for very limited resources left by the two giants.
+
+    \item In a similar fashion, we can get another plot for proportions of votes for Republican and Democratic presidential/senate candiates.
+\begin{Schunk}
+\begin{Sinput}
+> xy.prop <- vote[, c("BUSH", "GORE")]/pres.vote
+> cc.prop <- vote[, c("MCCOLLUM", "NELSON")]/senate.vote
+> viz.4d(x = xy.prop[, "GORE"], y = xy.prop[, "BUSH"], cex = cc.prop[, 
++     "MCCOLLUM"], col = cc.prop[, "NELSON"], ylab = "Bush", xlab = "Gore", 
++     cex.factor = 4, cex.lab = "McCollum", col.lab = "Nelson")
+\end{Sinput}
+\end{Schunk}
+\includegraphics{hw7-005}
+
+    This time a strong negative correlation between Bush and Gore, and between McCollum and Nelson can be easily identified. 
+    In addition, we can see consistent bias towards GOP or Democrats for each county as the X-Y values are highly correlated with size/color pairs. 
+
+    \item Finally we draw plot for proportions of votes for Gore and Nelson conditioning on proportions of Buchanan's vote.
+\begin{Schunk}
+\begin{Sinput}
+> coplot(xy.prop[, "GORE"] ~ cc.prop[, "NELSON"] | log(vote[, "BUCHANAN"]/pres.vote))
+\end{Sinput}
+\end{Schunk}
+\includegraphics{hw7-006}
+
+    What I can identify from the graph is that the strong correlation between Gore's and Nelson's votes are almost independent from Buchanan's, which is reasonable as Buchanan could only secure a tiny portion of the votes in every county.
+\end{enumerate}
+\section{}
+\begin{Schunk}
+\begin{Sinput}
+> plot.gamma <- function(x) {
++     n <- x[1]
++     shape <- x[2]
++     plt.main <- paste("shape=", shape, ", ", "n=", n, sep = "")
++     boxplot(apply(replicate(100, rgamma(n, shape = shape, scale = 1)), 
++         2, mean), main = plt.main)
++ }
+> layout(matrix(1:9, ncol = 3))
+> dummy <- apply(cbind(rep(c(5, 15, 30), each = 3), rep(c(1, 2, 
++     5), times = 3)), 1, plot.gamma)
+\end{Sinput}
+\end{Schunk}
+\includegraphics{hw7-007}
+\section{}
+I am literally wordless at this moment. So this is like a dummy comment on the plot.  
+\begin{Schunk}
+\begin{Sinput}
+> layout(c(1))
+> sim.exp <- rexp(100, rate = 5)
+> h <- hist(sim.exp, plot = F)
+> curve.func <- function(x) dexp(x, rate = 5)
+> c <- curve(curve.func, 0, max(h$breaks))
+> hist(sim.exp, freq = F, ylim = c(0, max(c$y, h$density)), xlim = c(0, 
++     max(c$x, h$breaks)))
+> lines(c)
+\end{Sinput}
+\end{Schunk}
+\includegraphics{hw7-008}
+\end{document}
