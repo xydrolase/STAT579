@@ -1,0 +1,804 @@
+\documentclass{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath, amssymb}
+\usepackage{enumerate}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{verbatim}
+\usepackage{/usr/share/R/share/texmf/tex/latex/Sweave}
+
+
+\pagestyle{fancy}
+\fancyhead[L]{STAT 579 HW8}
+\fancyhead[R]{Xin Yin}
+\titleformat{\section}{\em\Large} {$\dagger$ \thesection .}{10pt}{}
+
+\begin{document}
+\section{}
+\begin{Schunk}
+\begin{Sinput}
+> gcd <- function(m, n){
++     r <- m %% n
++     while (r > 0){
++         m <- r
++         r <- n %% r
++         n <- m
++     }
++     return (n)
++ }
+\end{Sinput}
+\end{Schunk}
+Some test runs,
+\begin{Schunk}
+\begin{Sinput}
+> gcd(7*7*12, 6*7*12*19)
+\end{Sinput}
+\begin{Soutput}
+[1] 84
+\end{Soutput}
+\begin{Sinput}
+> gcd(5*9*77*103, 4*77*113)
+\end{Sinput}
+\begin{Soutput}
+[1] 77
+\end{Soutput}
+\end{Schunk}
+\section{}
+\begin{Schunk}
+\begin{Sinput}
+> order.matrix <- function(x){
++     x.order <- order(as.vector(x))
++     row.idx <- x.order %% nrow(x)
++     row.idx[row.idx == 0] <- 4
++     return (cbind(row.idx, ceiling(x.order / nrow(x))))
++ }
+\end{Sinput}
+\end{Schunk}
+To test this function,
+\begin{Schunk}
+\begin{Sinput}
+> (x <- matrix(rchisq(12, df=1), ncol=3))
+\end{Sinput}
+\begin{Soutput}
+          [,1]       [,2]        [,3]
+[1,] 0.1666659  0.2419878 0.051959471
+[2,] 2.2877826 12.6035092 0.001197113
+[3,] 4.2755125  0.1831790 0.001059330
+[4,] 1.2272213  0.4360951 0.999420669
+\end{Soutput}
+\begin{Sinput}
+> (x.order <- order.matrix(x))
+\end{Sinput}
+\begin{Soutput}
+      row.idx  
+ [1,]       3 3
+ [2,]       2 3
+ [3,]       1 3
+ [4,]       1 1
+ [5,]       3 2
+ [6,]       1 2
+ [7,]       4 2
+ [8,]       4 3
+ [9,]       4 1
+[10,]       2 1
+[11,]       3 1
+[12,]       2 2
+\end{Soutput}
+\end{Schunk}
+The smallest value in matrix $\mathbf{X}$ is 0.001, and it is on 3rd row and 3rd column of the matrix. And we can verify the rest elements for this toy example. 
+
+\section{}
+\begin{enumerate}[(a)]
+    \item Notice that $\sum_{i=1}^p x_i^2 = R^2$, we can first solve $R$ as,
+        \[
+        R = \sqrt{\sum_{i=1}^p x_i^2}
+        \]
+        Then we can iteratively solve $\theta_1, \theta_2, \dots \theta_{p-1}$
+        by \verb=acos()= function and by multplying $1/\sin(\theta_i)$ to
+        $x_{i+1}$ .
+
+        Finally, we need to check the sign of $x_p$ since $\theta_2, \dots \theta_{p-1}$ are on $[0, \pi]$ and
+        $\sin(\theta_i) > 0, i = 2, \dots, p-1$. If $x_p < 0$, we should remap $\theta_1$ from $[0, \pi]$ to $[\pi, 2*\pi]$.
+        Thus, a R program can be implemented as below,
+\begin{Schunk}
+\begin{Sinput}
+> polaroid <- function(x){
++     R <- sqrt(sum(x^2))
++     theta <- rep(0, length(x) - 1)
++     theta[1] <- acos(x[1]/R)
++     c <- R*sin(theta[1])
++ 
++     if (length(x) > 2){
++         for (i in 2:(length(x)-1)){
++             theta[i] <- acos(x[i] / c)    
++             c <- c * sin(theta[i])
++         }
++     }
++     if (x[length(x)] < 0){
++         theta[1] <- 2*pi - theta[1]
++         theta[-1] <- pi - theta[-1]
++     }
++     return (c(R, theta))
++ }
+\end{Sinput}
+\end{Schunk}
+    Dummy test there,
+\begin{Schunk}
+\begin{Sinput}
+> polaroid(c(1, 1))
+\end{Sinput}
+\begin{Soutput}
+[1] 1.4142136 0.7853982
+\end{Soutput}
+\begin{Sinput}
+> polaroid(runif(10) * 10)
+\end{Sinput}
+\begin{Soutput}
+ [1] 16.9871929  1.2320202  1.2048015  1.2556236  1.2806858  1.0337803
+ [7]  1.5649962  1.1229180  0.3909194  0.8805879
+\end{Soutput}
+\end{Schunk}
+    \item It can be easily shown that, 
+        \[
+        \frac{\sum_{i=1}^n x_i^2}{\sum_{i=1}^n x_i^2} = 1
+        \]
+        Therefore, to normalize each row vector, just divide its elements by the sum of squares. 
+\begin{Schunk}
+\begin{Sinput}
+> normalize <- function(x){
++     sqrt.ss <- sqrt(apply(x^2, 1, sum))
++     return (sweep(x, 1, sqrt.ss, '/'))
++ }
+\end{Sinput}
+\end{Schunk}
+    \item
+\begin{Schunk}
+\begin{Sinput}
+> y <- matrix(rnorm(5000), ncol=5)
+> z <- normalize(y)
+> (p.val <- apply(z, 2, function(x) ks.test(x, 'punif', min=-1, max=1)$p.val))
+\end{Sinput}
+\begin{Soutput}
+[1] 4.041768e-10 4.925282e-12 4.759404e-11 3.176188e-09 5.077554e-10
+\end{Soutput}
+\end{Schunk}
+    So now we test if these 5 vectors, each with 1000 elements, are drawn from a Uniform$(-1, 1)$ distribution.
+    The null hypothesis $H_0$ of a Kolmogorov-Smirnov non-parametric test is that two samples are drawn from the same continuous distribution.
+
+    Given the small $p$-values {\tt(4.04176803137091e-10, 4.92528240414458e-12, 4.75940398203534e-11, 3.17618753520321e-09, 5.07755393286402e-10)}, we should be safe the reject the null hypothesis and conclude thatthe normalized normal random variable are not drawn from Uniform$(-1, 1)$ distribution.
+    Visual inspection of the histogram of normalized vectors in \verb=y=.
+\begin{Schunk}
+\begin{Sinput}
+> layout(matrix(1:6, ncol=2))
+> for (i in 1:5){
++     hist(z[, i])
++ }
+\end{Sinput}
+\end{Schunk}
+\begin{center}
+\includegraphics{hw8-009}
+\end{center}
+    \item
+        Now we obtain the polar representation of row vectors in \verb=y= using the \verb=polaroid()= function we previously defined. To visually inspect if the 1000 $R^2$ values are following a Chi-squared distribution of 5 degrees of freedom, we can overlay the function curve onto the histogram of $R^2$.
+\begin{Schunk}
+\begin{Sinput}
+> w <- t(apply(y, 1, polaroid))
+> h <- hist(w[, 1]^2, plot=F)
+> f.chisq <- function(x) dchisq(x, df=5)
+> xy <- curve(f.chisq, 0, max(h$breaks))
+\end{Sinput}
+\end{Schunk}
+\begin{Schunk}
+\begin{Sinput}
+> hist(w[,1]^2, freq=F, ylim=c(0, max(xy$y, h$density)),
++      main=expression(paste("Histogram of ", R^2)),
++      xlab=expression(R^2))
+> lines(xy)
+\end{Sinput}
+\end{Schunk}
+\begin{center}
+\includegraphics[width=0.5\textwidth]{hw8-011}
+\end{center}
+
+    The plot suggests that $\chi_5^2$ seems a good fit for $R^2$. To test this hypothesis that indeed samples of $R^2$ are drawn from a $\chi^2_5$ distribution, we can again use the Kolmogorov-Smirnov test,
+\begin{Schunk}
+\begin{Sinput}
+> (r.ks <- ks.test(w[, 1]^2, 'pchisq', df=5))
+\end{Sinput}
+\begin{Soutput}
+	One-sample Kolmogorov-Smirnov test
+
+data:  w[, 1]^2 
+D = 0.0233, p-value = 0.6508
+alternative hypothesis: two-sided 
+\end{Soutput}
+\end{Schunk}
+    We got a $p$-value of 0.650785673056323, given a significance level $\alpha=0.05$, we failed to reject the null hypothesis and we should conclude that indeed $R^2 \sim \chi^2_5$.
+
+    Now we examine the $\theta_i$'s. We can get following histograms of $\theta_i, i = 1,2,3,4$. 
+\begin{Schunk}
+\begin{Sinput}
+> layout(matrix(1:4, ncol=2, byrow=T))
+> theta.max = c(2*pi, rep(pi, 3))
+> for (i in 1:4){
++     hist(w[,i+1], freq=F, 
++          main=expression(theta[i]),
++          xlab=paste('i=', i)
++     )
++     cat("[Kolmogorov-Smirnov]", paste("theta_", i, sep=""), 
++         ks.test(w[,i+1], 'punif', min=0, max=theta.max[i])$p.val,
++         fill=T)
++ }
+\end{Sinput}
+\begin{Soutput}
+[Kolmogorov-Smirnov] theta_1 2.889244e-12
+[Kolmogorov-Smirnov] theta_2 0
+[Kolmogorov-Smirnov] theta_3 1.006967e-09
+[Kolmogorov-Smirnov] theta_4 0.3782906
+\end{Soutput}
+\end{Schunk}
+\begin{center}
+\includegraphics{hw8-013}
+\end{center}
+
+    And we can see that from the above $p$-values, $\theta_i, i = 1,2,3$ are
+    not drawn from uniform distributions. However, choosing $\alpha=0.05$, we
+    failed to reject the null hypothesis for $\theta_4$. Therefore, $\theta_4$
+    is drawn from Uniform$(0, \pi)$.
+
+\end{enumerate}
+\section{}
+We are interested in using fixed point method to find fixed point of a
+bivariate function $f(x1, x2) = (\log(1+x2+x2), \log(5-x1-x2))$. So let's
+define the function first in R.
+\begin{Schunk}
+\begin{Sinput}
+> f.x1x2 <- function(x, y){
++     return (c(log(1+x+y), log(5-x-y)))
++ }
+\end{Sinput}
+\end{Schunk}
+
+Now we modify the \verb=fixedpoint= function provided in the textbook such that
+the new version can handle multivariate function \verb=ftn= as argument. We set
+the condition for iteration to end as $\sum_i{x_i^{(n+1)} - x^{(n)}_i} < tol$,
+where $tol$ is the tolerance for convergence and $x_i^{(n)}$ denotes the $i$-th
+variate at $n$-th iteration.
+
+To avoid writing multivariate functions taking a vector as parameter, we
+wrap the function calls with \verb=do.call()= function, which assigns the
+corresponding argument of function \verb=ftn= with element in a list.
+
+So, finally what we got is,
+\begin{Schunk}
+\begin{Sinput}
+> fixed.point <- function(ftn, x0, eps=1e-9, max.iter=100){
++     # ftn takes two arguments, so wrap the function call using do.call to
++     # circumvent explicitly calling function with all the arguments in place.
++     x1 <- do.call(ftn, as.list(x0)) 
++     iter <- 1
++     cat("[ITER]", iter, x1, fill=T)
++ 
++     while(sum(abs(x1-x0)) > eps && iter < max.iter){
++         x0 <- x1
++         x1 <- do.call(ftn, as.list(x0))
++         iter <- iter + 1
++         cat("[ITER]", iter, x1, fill=T)
++     }
++ 
++     if (sum(abs(x1-x0)) < eps){
++         return (x1)
++     } else {
++         return (NULL)
++     }
++ }
+\end{Sinput}
+\end{Schunk}
+
+And we try this method by staring at $(0, 0)$ and see how it goes.
+
+\begin{Schunk}
+\begin{Sinput}
+> (fpv <- fixed.point(f.x1x2, c(0, 0), eps=1e-9, max.iter=100))
+\end{Sinput}
+\begin{Soutput}
+[ITER] 1 0 1.609438
+[ITER] 2 0.9591348 1.220996
+[ITER] 3 1.156922 1.036691
+[ITER] 4 1.161153 1.031898
+[ITER] 5 1.160977 1.032098
+[ITER] 6 1.160984 1.03209
+[ITER] 7 1.160984 1.03209
+[ITER] 8 1.160984 1.03209
+[ITER] 9 1.160984 1.03209
+[ITER] 10 1.160984 1.03209
+[1] 1.160984 1.032090
+\end{Soutput}
+\begin{Sinput}
+> do.call(f.x1x2, as.list(fpv))
+\end{Sinput}
+\begin{Soutput}
+[1] 1.160984 1.032090
+\end{Soutput}
+\end{Schunk}
+
+So, at least for this particular function and for this initial vector
+$\mathbf{x}_0 = (0,0)$, the algorithm converges to the fixed point, which is
+(1.160984, 1.03209) in a two-dimensional plane.
+\section{}
+If we second-order Taylor expansion for $f(x)$, we get,
+\[
+f(x) \approx g(x) = f(x_n) + f'(x_n) (x-x_n) + \frac{1}{2} f''(x_n) (x- x_n)^2
+\]
+
+To find the roots for $f(x)$ iteratively, we can set $x_{n+1}$ to the roots of quadratic equation $g(x) = 0$, namely,
+\[
+f''(x_n) x^2 + (2'f(x_0) - 2 x_n f''(x_n)) x + (2f(x_n) - 2x_n f'(x_n) + x_n^2 f''(x_n)) = 0
+\]
+
+\[
+\begin{cases}
+    a = f''(x_n) \\
+    b = 2'f(x_0) - 2 x_n f''(x_n) \\
+    c = 2f(x_n) - 2x_n f'(x_n) + x_n^2 f''(x_n)
+\end{cases}
+\]
+If the discriminant $\Delta = b^2 - 4ac < 0$, we can set $x_{n+1}$ to the maximum or minimum of $g(x)$, namely, the solution of $g'(x) = 0$. Solving this, we will have,
+\[
+x_{n+1} = x_n - \frac{f'(x_n)}{f''(x_n)}
+\]
+
+Now we are trying to find fixed points for function $f(x)$, which is equivalent to find the root of function $h(x) = f(x) - x$. And implement above algorithm in R as a function \verb=newton.quad()=, we can work out fixed points for following functions, if they exist.
+\begin{Schunk}
+\begin{Sinput}
+> newton.quad <- function(f, f.fd, f.sd, x0, eps, max.iter=100,
++                         verbose=F){
++     # f.fd := first derivative of function f
++     # f.sd := second derivative of function f
++ 
++     # Initialization
++     iter <- 1
++     x1 <- NA
++ 
++     while ((is.na(x1) || abs(x1-x0) > eps) && iter < max.iter){
++         # Quadratic coefficients
++         if (!is.na(x1)) x0 <- x1 # update x0
++ 
++         a <- 0.5*f.sd(x0)
++         b <- f.fd(x0) - f.sd(x0)*x0
++         c <- f(x0) - x0*f.fd(x0) + 0.5*f.sd(x0)*x0^2
++ 
++         if (is.nan(c(a,b,c))){
++             cat("[ERROR] NaN encountered. Algorithm aborted.", fill=T)
++             return (NULL)
++         }
++ 
++         if (!is.nan(a) && abs(a) > 0){
++             # Discriminant of quadratic formula
++             delta <- b^2 - 4*a*c
++ 
++             if (delta < 0){
++                 # No real solution, find the point where the derivative of function
++                 # g(x) equals 0.
++                 x1 <- x0 - f.fd(x0)/f.sd(x0) 
++             } else {
++                 # Candidates of two x1
++                 x1.cand <- (-b + c(1, -1) * sqrt(delta))/2/a
++                 # Choose a x1 that is closer to x0
++                 x1 <- x1.cand[which.min(abs(x1.cand-x0))]
++             }
++         } else {
++             # Not quadratic equation
++             x1 <- -c/b
++         }
++ 
++         if (verbose){
++             cat("[ITER]", iter, "/", x1, fill=T)
++         }
++ 
++         iter <- iter + 1
++     }
++ 
++     if (abs(x1-x0) > eps){
++         return (NULL)
++     } else {
++         return (x1)
++     }
++ }
+\end{Sinput}
+\end{Schunk}
+    \begin{enumerate}[(a)]
+        \item For $f(x) = \cos(x) - x$, we have the following,
+            \begin{eqnarray*}
+                h(x) = \cos(x) - 2x\\
+                h'(x) = -\sin(x) - 2\\
+                h''(x) = -\cos(x)
+            \end{eqnarray*}
+            So, 
+\begin{Schunk}
+\begin{Sinput}
+> fa <- function(x) cos(x) - 2*x
+> fa.fd <- function(x) -sin(x) - 2
+> fa.sd <- function(x) -cos(x)
+> for (i in 1:3){
++     cat("x0 =", i, fill=T)
++     (xa <- newton.quad(fa, fa.fd, fa.sd, i, 1e-6, 100, verbose=T))
++ }
+\end{Sinput}
+\begin{Soutput}
+x0 = 1
+[ITER] 1 / 0.4583998
+[ITER] 2 / 0.4501836
+[ITER] 3 / 0.4501836
+x0 = 2
+[ITER] 1 / 0.6185472
+[ITER] 2 / 0.450361
+[ITER] 3 / 0.4501836
+[ITER] 4 / 0.4501836
+x0 = 3
+[ITER] 1 / 0.8269996
+[ITER] 2 / 0.4525812
+[ITER] 3 / 0.4501836
+[ITER] 4 / 0.4501836
+\end{Soutput}
+\end{Schunk}
+    If we compare the results with a Newton method using only the first-order expansion, we will get,
+\begin{Schunk}
+\begin{Sinput}
+> newton <- function(f, f.prime, x0, eps, max.iter){
++     x1 <- x0 - f(x0)/f.prime(x0)
++     iter <- 1
++     while(abs(x1 - x0) > eps & iter < max.iter){
++         x0 <- x1
++         x1 <- x0 - f(x0)/f.prime(x0)
++         cat("[ITER]", iter, "/", x1, fill=T)
++         iter <- iter + 1
++     }
++ 
++     if (abs(x1 - x0) < eps){
++         return (x1)
++     } else {
++         return (NULL)
++     }
++ }
+> (xa.1 <- newton(fa, fa.fd, 3, 1e-6, 100))
+\end{Sinput}
+\begin{Soutput}
+[ITER] 1 / 0.595022
+[ITER] 2 / 0.4536808
+[ITER] 3 / 0.4501859
+[ITER] 4 / 0.4501836
+[ITER] 5 / 0.4501836
+[1] 0.4501836
+\end{Soutput}
+\end{Schunk}
+    Both methods converge to \verb|x=|0.450184, and we can check that,
+\begin{Schunk}
+\begin{Sinput}
+> fa(xa)
+\end{Sinput}
+\begin{Soutput}
+[1] 2.220446e-16
+\end{Soutput}
+\end{Schunk}
+    So $x$ is indeed the root for $h(x)$, \emph{i.e.} fixed point for $f(x) = \cos(x) - x$.
+
+    \item Following the similar fashion, given $f(x) = \log(x) - \exp(-x)$,
+\begin{Schunk}
+\begin{Sinput}
+> fb <- function(x) log(x) - exp(-x) - x
+> fb.fd <- function(x) 1/x + exp(-x) - 1
+> fb.sd <- function(x) -1/x^2 - exp(-x)
+> (xb <- newton.quad(fb, fb.fd, fb.sd, 2, 1e-6, 100, verbose=T))
+\end{Sinput}
+\begin{Soutput}
+[ITER] 1 / 1.053643
+[ITER] 2 / 1.291954
+[ITER] 3 / 1.347748
+[ITER] 4 / 1.349973
+[ITER] 5 / 1.349976
+[ITER] 6 / 1.349976
+[1] 1.349976
+\end{Soutput}
+\begin{Sinput}
+> fb(xb)
+\end{Sinput}
+\begin{Soutput}
+[1] -1.309136
+\end{Soutput}
+\end{Schunk}
+    We can see that \verb|x=|1.3499765 is not the root for $h(x)$. Actually, there's no root for $h(x)$ as $h(x)$ never traverses $x$-axis for $\forall x \in (0, \infty)$.
+
+    \item For $f(x) = x^3-x-3$, $h(x) = x^3-2x-3$.
+\begin{Schunk}
+\begin{Sinput}
+> fc <- function(x) x^3 - 2*x - 3
+> fc.fd <- function(x) 3*x^2 - 2
+> fc.sd <- function(x) 6*x
+> (xc <- newton.quad(fc, fc.fd, fc.sd, 0, 1e-6, 100, verbose=T))
+\end{Sinput}
+\begin{Soutput}
+[ITER] 1 / -1.5
+[ITER] 2 / -0.9722222
+[ITER] 3 / -0.8289683
+[ITER] 4 / -0.8165904
+[ITER] 5 / -0.8164966
+[ITER] 6 / -0.8164966
+[1] -0.8164966
+\end{Soutput}
+\begin{Sinput}
+> fc(xc)
+\end{Sinput}
+\begin{Soutput}
+[1] -1.911338
+\end{Soutput}
+\end{Schunk}
+    So it converges to \verb|x=|-0.8164966, which is not a fixed point for $f(x)$, even though it converges fast.
+
+    If we use the Newton-Raphson method, we will get,
+\begin{Schunk}
+\begin{Sinput}
+> (xc.1 <- newton(fc, fc.fd, 0, 1e-6, 100))
+\end{Sinput}
+\begin{Soutput}
+[ITER] 1 / -0.7894737
+[ITER] 2 / -15.48376
+[ITER] 3 / -10.34711
+[ITER] 4 / -6.931897
+[ITER] 5 / -4.665179
+[ITER] 6 / -3.160998
+[ITER] 7 / -2.150751
+[ITER] 8 / -1.422692
+[ITER] 9 / -0.6775787
+[ITER] 10 / -3.818818
+[ITER] 11 / -2.595981
+[ITER] 12 / -1.755976
+[ITER] 13 / -1.0798
+[ITER] 14 / 0.3217651
+[ITER] 15 / -1.815215
+[ITER] 16 / -1.136622
+[ITER] 17 / 0.03367986
+[ITER] 18 / -1.502595
+[ITER] 19 / -0.7929593
+[ITER] 20 / -17.62304
+[ITER] 21 / -11.77074
+[ITER] 22 / -7.87785
+[ITER] 23 / -5.292641
+[ITER] 24 / -3.577879
+[ITER] 25 / -2.433888
+[ITER] 26 / -1.638138
+[ITER] 27 / -0.9572577
+[ITER] 28 / 1.663023
+[ITER] 29 / 1.937238
+[ITER] 30 / 1.894492
+[ITER] 31 / 1.89329
+[ITER] 32 / 1.893289
+[1] 1.893289
+\end{Soutput}
+\begin{Sinput}
+> fc(xc.1)
+\end{Sinput}
+\begin{Soutput}
+[1] 5.000889e-12
+\end{Soutput}
+\end{Schunk}
+    We can see that through trials and errors, the Newton-Raphson converges to the true fixed point for $f(x)$, after 32 iterations, whereas the Newton method using second-order expansion didn't.
+
+    To conclude, while the second-order Newton method converges faster than its first-order counterpart, it tends to converge to a local maximum rather than the true root of a function.
+
+    \item For $f(x) = x^3-7x^2+ 14x -8$, 
+\begin{Schunk}
+\begin{Sinput}
+> fd <- function(x) x^3 - 7*x^2 + 13*x - 8
+> fd.fd <- function(x) 3*x^2 - 14 * x + 13 
+> fd.sd <- function(x) 6*x - 14
+> for (i in 1 + (1:9)/10){
++     cat("x0=", i, fill=T)
++     xd <- newton.quad(fd, fd.fd, fd.sd, i, 1e-6, 100, verbose=T)
++ }
+\end{Sinput}
+\begin{Soutput}
+x0= 1.1
+[ITER] 1 / 1.266216
+[ITER] 2 / 1.279161
+[ITER] 3 / 1.279241
+[ITER] 4 / 1.279241
+x0= 1.2
+[ITER] 1 / 1.276471
+[ITER] 2 / 1.279237
+[ITER] 3 / 1.279241
+[ITER] 4 / 1.279241
+x0= 1.3
+[ITER] 1 / 1.279032
+[ITER] 2 / 1.279241
+[ITER] 3 / 1.279241
+x0= 1.4
+[ITER] 1 / 1.271429
+[ITER] 2 / 1.279212
+[ITER] 3 / 1.279241
+[ITER] 4 / 1.279241
+x0= 1.5
+[ITER] 1 / 1.25
+[ITER] 2 / 1.278846
+[ITER] 3 / 1.279241
+[ITER] 4 / 1.279241
+x0= 1.6
+[ITER] 1 / 1.209091
+[ITER] 2 / 1.277052
+[ITER] 3 / 1.279239
+[ITER] 4 / 1.279241
+[ITER] 5 / 1.279241
+x0= 1.7
+[ITER] 1 / 1.139474
+[ITER] 2 / 1.271059
+[ITER] 3 / 1.279209
+[ITER] 4 / 1.279241
+[ITER] 5 / 1.279241
+x0= 1.8
+[ITER] 1 / 1.025
+[ITER] 2 / 1.254538
+[ITER] 3 / 1.278958
+[ITER] 4 / 1.279241
+[ITER] 5 / 1.279241
+x0= 1.9
+[ITER] 1 / 0.8346154
+[ITER] 2 / 1.213287
+[ITER] 3 / 1.277299
+[ITER] 4 / 1.279239
+[ITER] 5 / 1.279241
+[ITER] 6 / 1.279241
+\end{Soutput}
+\begin{Sinput}
+> fd(xd)
+\end{Sinput}
+\begin{Soutput}
+[1] -0.7316462
+\end{Soutput}
+\end{Schunk}
+    In all cases, the second-order Newton method converges to \verb|x=|1.2792408, which is, again, not the true fixed point. The only difference between using different $x_0$ is that it takes longer to converge for larger $x_i$'s. 
+
+    Now we try the Newton-Raphson method,
+\begin{Schunk}
+\begin{Sinput}
+> (xd.1 <- newton(fd, fd.fd, 1.9, 1e-6, 100))
+\end{Sinput}
+\begin{Soutput}
+[ITER] 1 / -36.45989
+[ITER] 2 / -23.54724
+[ITER] 3 / -14.94752
+[ITER] 4 / -9.226816
+[ITER] 5 / -5.430315
+[ITER] 6 / -2.922316
+[ITER] 7 / -1.27863
+[ITER] 8 / -0.2129591
+[ITER] 9 / 0.4754603
+[ITER] 10 / 0.9445703
+[ITER] 11 / 1.402572
+[ITER] 12 / 0.3433539
+[ITER] 13 / 0.8489471
+[ITER] 14 / 1.275213
+[ITER] 15 / 29.9449
+[ITER] 16 / 20.76925
+[ITER] 17 / 14.66728
+[ITER] 18 / 10.62325
+[ITER] 19 / 7.965923
+[ITER] 20 / 6.258146
+[ITER] 21 / 5.224971
+[ITER] 22 / 4.697843
+[ITER] 23 / 4.529385
+[ITER] 24 / 4.511735
+[ITER] 25 / 4.511547
+[ITER] 26 / 4.511547
+[1] 4.511547
+\end{Soutput}
+\begin{Sinput}
+> fd(xd.1)
+\end{Sinput}
+\begin{Soutput}
+[1] 7.105427e-15
+\end{Soutput}
+\end{Schunk}
+    Surprisingly, it converges to the fixed point of $f(x)$, though it takes longer to converge.
+
+    \item Finally, for $f(x) = \log(x) \exp(-x)$, we have,
+\begin{Schunk}
+\begin{Sinput}
+> fe <- function(x) log(x)*exp(-x) - x
+> fe.fd <- function(x) exp(-x)/x - log(x) * exp(-x) - 1
+> fe.sd <- function(x) -(exp(-x)*x + exp(-x))/(x^2) - exp(-x)/x + log(x) * exp(-x)
+> xe <- newton.quad(fe, fe.fd, fe.sd, 2, 1e-6, 100, verbose=T)
+\end{Sinput}
+\begin{Soutput}
+[ITER] 1 / -0.00529828
+[ERROR] NaN encountered. Algorithm aborted.
+\end{Soutput}
+\end{Schunk}
+    So, we simply can't converge because $x_1$ is negative and \verb=NaN= will be produced by feeding a negative $x$ to $\log(x)$. Same story for Newton-Raphson method (results not shown).
+    \end{enumerate}
+
+    If from these examples we learnt anything, it is that while using second-order expansion leads to faster convergence, the accuracy is actually inferior. In many cases, the algorithm converges to a local maximum/minimum instead of converging to the root of the function. I guess that's why no one bothers to use the second-order expansion and stays with the Newton-Raphson method.
+\section{}
+\begin{enumerate}[(a)]
+    \item To plot the log likelihood function, we get,
+\begin{Schunk}
+\begin{Sinput}
+> log.ll <- function(x, theta) {-length(x) * log(2*pi) + sum(log(1-cos(x-theta)))}
+> x <- c(3.91, 4.85, 2.28, 4.06, 3.70, 4.04, 5.46, 3.53, 2.28, 1.96, 2.53, 
++    3.88, 2.22, 3.47, 4.82, 2.46, 2.99, 2.54, 0.52, 2.50)
+> theta <- seq(-pi, pi, length.out=500)
+> plot(theta, sapply(theta, log.ll, x=x), typ='l',
++      xlab=expression(theta), ylab=expression(l(theta)))
+\end{Sinput}
+\end{Schunk}
+\begin{center}
+\includegraphics[width=0.5\textwidth]{hw8-027}
+\end{center}
+
+    which is a complex function with funny shape, and with a lot of local maxima/minima. 
+    \item Now we use the \verb=optimize()= function to find the maximum of this log likelihood function on $(-\pi, pi)$. Since \verb=optimize()= takes a function with argument \verb=x= for optimization, we need to rewrite our \verb=log.ll= function a little bit.
+\begin{Schunk}
+\begin{Sinput}
+> log.ll2 <- function(x){
++     # X is theta here
++     x.i <- c(3.91, 4.85, 2.28, 4.06, 3.70, 4.04, 5.46, 3.53, 2.28, 1.96, 2.53,
++       3.88, 2.22, 3.47, 4.82, 2.46, 2.99, 2.54, 0.52, 2.50)
++     return (-length(x.i) * log(2*pi) + sum(log(1-cos(x.i-x))))
++ }
+> (theta.hat <- optimize(log.ll2, c(-pi, pi), tol=1e-8, maximum=T))
+\end{Sinput}
+\begin{Soutput}
+$maximum
+[1] -0.01197201
+
+$objective
+[1] -31.34291
+\end{Soutput}
+\end{Schunk}
+    So, the maximal likelihood estimator $\hat \theta$ is -0.011972 and $l(\hat \theta)=~$-31.3429126.
+    \item Now we use the \verb=newton()= function we have implemented previously.
+\begin{Schunk}
+\begin{Sinput}
+> # First derivative of log-likelihood function
+> dl <- function(theta){
++     x.i <- c(3.91, 4.85, 2.28, 4.06, 3.70, 4.04, 5.46, 3.53, 2.28, 1.96, 2.53, 
++              3.88, 2.22, 3.47, 4.82, 2.46, 2.99, 2.54, 0.52, 2.50)
++     return (-sum(sin(x.i-theta)/(1-cos(x.i-theta))))
++ }
+> # Second derivative
+> d2l <- function(theta){
++     x.i <- c(3.91, 4.85, 2.28, 4.06, 3.70, 4.04, 5.46, 3.53, 2.28, 1.96, 2.53,
++              3.88, 2.22, 3.47, 4.82, 2.46, 2.99, 2.54, 0.52, 2.50)
++     return (-sum(1/(1-cos(x.i-theta))))
++ }
+> for (x0 in c(0, -1.5, -2.0, -2.7)){
++     cat("x0 =", x0, fill=T)
++     newton(dl, d2l, x0, 1e-6, 100)
++ }
+\end{Sinput}
+\begin{Soutput}
+x0 = 0
+[ITER] 1 / -0.011972
+[ITER] 2 / -0.011972
+x0 = -1.5
+[ITER] 1 / -1.589234
+[ITER] 2 / -1.638776
+[ITER] 3 / -1.656963
+[ITER] 4 / -1.658278
+[ITER] 5 / -1.658283
+[ITER] 6 / -1.658283
+x0 = -2
+[ITER] 1 / -1.641367
+[ITER] 2 / -1.657301
+[ITER] 3 / -1.65828
+[ITER] 4 / -1.658283
+[ITER] 5 / -1.658283
+x0 = -2.7
+[ITER] 1 / -2.666794
+[ITER] 2 / -2.6667
+[ITER] 3 / -2.6667
+\end{Soutput}
+\end{Schunk}
+    We can see that, if we start ``close enough'' to the root, the Newton-Raphson method can converge to the expected truth. Otherwise, because the log-likihood function, as we saw moments ago, has a lot of local maxima/mimima, the method can't guarantee convergence to the root.
+\end{enumerate}
+
+\end{document}

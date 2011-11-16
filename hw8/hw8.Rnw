@@ -1,0 +1,441 @@
+\documentclass{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath, amssymb}
+\usepackage{enumerate}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{verbatim}
+\usepackage{/usr/share/R/share/texmf/tex/latex/Sweave}
+\SweaveOpts{pdf=TRUE,eps=FALSE}
+
+\pagestyle{fancy}
+\fancyhead[L]{STAT 579 HW8}
+\fancyhead[R]{Xin Yin}
+\titleformat{\section}{\em\Large} {$\dagger$ \thesection .}{10pt}{}
+
+\begin{document}
+\section{}
+<<>>=
+gcd <- function(m, n){
+    r <- m %% n
+    while (r > 0){
+        m <- r
+        r <- n %% r
+        n <- m
+    }
+    return (n)
+}
+@
+Some test runs,
+<<>>=
+gcd(7*7*12, 6*7*12*19)
+gcd(5*9*77*103, 4*77*113)
+@
+\section{}
+<<>>=
+order.matrix <- function(x){
+    x.order <- order(as.vector(x))
+    row.idx <- x.order %% nrow(x)
+    row.idx[row.idx == 0] <- 4
+    return (cbind(row.idx, ceiling(x.order / nrow(x))))
+}
+@
+To test this function,
+<<>>=
+(x <- matrix(rchisq(12, df=1), ncol=3))
+(x.order <- order.matrix(x))
+@
+The smallest value in matrix \verb=x= is \Sexpr{round(min(x),3)}, and it is on \Sexpr{x.order[1,1]}th row and \Sexpr{x.order[1,2]}th column of the matrix. And we can verify the rest elements for this toy example. 
+
+\section{}
+\begin{enumerate}[(a)]
+    \item Notice that $\sum_{i=1}^p x_i^2 = R^2$, we can first solve $R$ as,
+        \[
+        R = \sqrt{\sum_{i=1}^p x_i^2}
+        \]
+        Then we can iteratively solve $\theta_1, \theta_2, \dots \theta_{p-1}$
+        by \verb=acos()= function and by multplying $1/\sin(\theta_i)$ to
+        $x_{i+1}$ .
+
+        Finally, we need to check the sign of $x_p$ since $\theta_2, \dots \theta_{p-1}$ are on $[0, \pi]$ and
+        $\sin(\theta_i) > 0, i = 2, \dots, p-1$. If $x_p < 0$, we should remap $\theta_1$ from $[0, \pi]$ to $[\pi, 2*\pi]$.
+        Thus, a R program can be implemented as below,
+<<>>=
+polaroid <- function(x){
+    R <- sqrt(sum(x^2))
+    theta <- rep(0, length(x) - 1)
+    theta[1] <- acos(x[1]/R)
+    c <- R*sin(theta[1])
+
+    if (length(x) > 2){
+        for (i in 2:(length(x)-1)){
+            theta[i] <- acos(x[i] / c)    
+            c <- c * sin(theta[i])
+        }
+    }
+    if (x[length(x)] < 0){
+        theta[1] <- 2*pi - theta[1]
+        theta[-1] <- pi - theta[-1]
+    }
+    return (c(R, theta))
+}
+@
+    Dummy test there,
+<<>>=
+polaroid(c(1, 1))
+polaroid(runif(10) * 10)
+@
+    \item It can be easily shown that, 
+        \[
+        \frac{\sum_{i=1}^n x_i^2}{\sum_{i=1}^n x_i^2} = 1
+        \]
+        Therefore, to normalize each row vector, just divide its elements by the sum of squares. 
+<<>>=
+normalize <- function(x){
+    sqrt.ss <- sqrt(apply(x^2, 1, sum))
+    return (sweep(x, 1, sqrt.ss, '/'))
+}
+@
+    \item
+<<>>=
+y <- matrix(rnorm(5000), ncol=5)
+z <- normalize(y)
+(p.val <- apply(z, 2, function(x) ks.test(x, 'punif', min=-1, max=1)$p.val))
+@
+    So now we test if these 5 vectors, each with 1000 elements, are drawn from a Uniform$(-1, 1)$ distribution.
+    The null hypothesis $H_0$ of a Kolmogorov-Smirnov non-parametric test is that two samples are drawn from the same continuous distribution.
+
+    Given the small $p$-values {\tt(\Sexpr{paste(p.val, collapse=", ")})}, we should be safe the reject the null hypothesis and conclude thatthe normalized normal random variable are not drawn from Uniform$(-1, 1)$ distribution.
+    Visual inspection of the histogram of normalized vectors in \verb=y=.
+<<fig=TRUE>>=
+layout(matrix(1:6, ncol=2))
+for (i in 1:5){
+    hist(z[, i])
+}
+@
+    \item
+        Now we obtain the polar representation of row vectors in \verb=y= using the \verb=polaroid()= function we previously defined. To visually inspect if the 1000 $R^2$ values are following a Chi-squared distribution of 5 degrees of freedom, we can overlay the function curve onto the histogram of $R^2$.
+<<>>=
+w <- t(apply(y, 1, polaroid))
+h <- hist(w[, 1]^2, plot=F)
+f.chisq <- function(x) dchisq(x, df=5)
+xy <- curve(f.chisq, 0, max(h$breaks))
+@
+<<fig=TRUE>>=
+hist(w[,1]^2, freq=F, ylim=c(0, max(xy$y, h$density)),
+     main=expression(paste("Histogram of ", R^2)),
+     xlab=expression(R^2))
+lines(xy)
+@
+
+    The plot suggests that $\chi_5^2$ seems a good fit for $R^2$. To test this hypothesis that indeed samples of $R^2$ are drawn from a $\chi^2_5$ distribution, we can again use the Kolmogorov-Smirnov test,
+<<>>=
+(r.ks <- ks.test(w[, 1]^2, 'pchisq', df=5))
+@
+    We got a $p$-value of \Sexpr{r.ks$p.val}, given a significance level $\alpha=0.05$, we failed to reject the null hypothesis and we should conclude that indeed $R^2 \sim \chi^2_5$.
+
+    Now we examine the $\theta_i$'s. We can get following histograms of $\theta_i, i = 1,2,3,4$. 
+<<fig=TRUE>>=
+layout(matrix(1:4, ncol=2, byrow=T))
+theta.max = c(2*pi, rep(pi, 3))
+for (i in 1:4){
+    hist(w[,i+1], freq=F, 
+         main=expression(theta[i]),
+         xlab=paste('i=', i)
+    )
+    cat("[Kolmogorov-Smirnov]", paste("theta_", i, sep=""), 
+        ks.test(w[,i+1], 'punif', min=0, max=theta.max[i])$p.val,
+        fill=T)
+}
+@
+
+    And we can see that from the above $p$-values, $\theta_i, i = 1,2,3$ are
+    not drawn from uniform distributions. However, choosing $\alpha=0.05$, we
+    failed to reject the null hypothesis for $\theta_4$. Therefore, $\theta_4$
+    is drawn from Uniform$(0, \pi)$.
+
+\end{enumerate}
+\section{}
+We are interested in using fixed point method to find fixed point of a
+bivariate function $f(x1, x2) = (\log(1+x2+x2), \log(5-x1-x2))$. So let's
+define the function first in R.
+<<>>=
+f.x1x2 <- function(x, y){
+    return (c(log(1+x+y), log(5-x-y)))
+}
+@
+
+Now we modify the \verb=fixedpoint= function provided in the textbook such that
+the new version can handle multivariate function \verb=ftn= as argument. We set
+the condition for iteration to end as $\sum_i{x_i^{(n+1)} - x^{(n)}_i} < tol$,
+where $tol$ is the tolerance for convergence and $x_i^{(n)}$ denotes the $i$-th
+variate at $n$-th iteration.
+
+To avoid writing multivariate functions taking a vector as parameter, we
+wrap the function calls with \verb=do.call()= function, which assigns the
+corresponding argument of function \verb=ftn= with element in a list.
+
+So, finally what we got is,
+<<>>=
+fixed.point <- function(ftn, x0, eps=1e-9, max.iter=100){
+    # ftn takes two arguments, so wrap the function call using do.call to
+    # circumvent explicitly calling function with all the arguments in place.
+    x1 <- do.call(ftn, as.list(x0)) 
+    iter <- 1
+    cat("[ITER]", iter, x1, fill=T)
+
+    while(sum(abs(x1-x0)) > eps && iter < max.iter){
+        x0 <- x1
+        x1 <- do.call(ftn, as.list(x0))
+        iter <- iter + 1
+        cat("[ITER]", iter, x1, fill=T)
+    }
+
+    if (sum(abs(x1-x0)) < eps){
+        return (x1)
+    } else {
+        return (NULL)
+    }
+}
+@
+
+And we try this method by staring at $(0, 0)$ and see how it goes.
+
+<<>>=
+(fpv <- fixed.point(f.x1x2, c(0, 0), eps=1e-9, max.iter=100))
+do.call(f.x1x2, as.list(fpv))
+@
+
+So, at least for this particular function and for this initial vector
+$\mathbf{x}_0 = (0,0)$, the algorithm converges to the fixed point, which is
+(\Sexpr{paste(round(fpv,6), collapse=", ")}) in a two-dimensional plane.
+\section{}
+If we second-order Taylor expansion for $f(x)$, we get,
+\[
+f(x) \approx g(x) = f(x_n) + f'(x_n) (x-x_n) + \frac{1}{2} f''(x_n) (x- x_n)^2
+\]
+
+To find the roots for $f(x)$ iteratively, we can set $x_{n+1}$ to the roots of quadratic equation $g(x) = 0$, namely,
+\[
+f''(x_n) x^2 + (2'f(x_0) - 2 x_n f''(x_n)) x + (2f(x_n) - 2x_n f'(x_n) + x_n^2 f''(x_n)) = 0
+\]
+
+\[
+\begin{cases}
+    a = f''(x_n) \\
+    b = 2'f(x_0) - 2 x_n f''(x_n) \\
+    c = 2f(x_n) - 2x_n f'(x_n) + x_n^2 f''(x_n)
+\end{cases}
+\]
+If the discriminant $\Delta = b^2 - 4ac < 0$, we can set $x_{n+1}$ to the maximum or minimum of $g(x)$, namely, the solution of $g'(x) = 0$. Solving this, we will have,
+\[
+x_{n+1} = x_n - \frac{f'(x_n)}{f''(x_n)}
+\]
+
+Now we are trying to find fixed points for function $f(x)$, which is equivalent to find the root of function $h(x) = f(x) - x$. And implement above algorithm in R as a function \verb=newton.quad()=, we can work out fixed points for following functions, if they exist.
+<<>>=
+newton.quad <- function(f, f.fd, f.sd, x0, eps, max.iter=100,
+                        verbose=F){
+    # f.fd := first derivative of function f
+    # f.sd := second derivative of function f
+
+    # Initialization
+    iter <- 1
+    x1 <- NA
+
+    while ((is.na(x1) || abs(x1-x0) > eps) && iter < max.iter){
+        # Quadratic coefficients
+        if (!is.na(x1)) x0 <- x1 # update x0
+
+        a <- 0.5*f.sd(x0)
+        b <- f.fd(x0) - f.sd(x0)*x0
+        c <- f(x0) - x0*f.fd(x0) + 0.5*f.sd(x0)*x0^2
+
+        if (is.nan(c(a,b,c))){
+            cat("[ERROR] NaN encountered. Algorithm aborted.", fill=T)
+            return (NULL)
+        }
+
+        if (!is.nan(a) && abs(a) > 0){
+            # Discriminant of quadratic formula
+            delta <- b^2 - 4*a*c
+
+            if (delta < 0){
+                # No real solution, find the point where the derivative of function
+                # g(x) equals 0.
+                x1 <- x0 - f.fd(x0)/f.sd(x0) 
+            } else {
+                # Candidates of two x1
+                x1.cand <- (-b + c(1, -1) * sqrt(delta))/2/a
+                # Choose a x1 that is closer to x0
+                x1 <- x1.cand[which.min(abs(x1.cand-x0))]
+            }
+        } else {
+            # Not quadratic equation
+            x1 <- -c/b
+        }
+
+        if (verbose){
+            cat("[ITER]", iter, "/", x1, fill=T)
+        }
+
+        iter <- iter + 1
+    }
+
+    if (abs(x1-x0) > eps){
+        return (NULL)
+    } else {
+        return (x1)
+    }
+}
+@
+    \begin{enumerate}[(a)]
+        \item For $f(x) = \cos(x) - x$, we have the following,
+            \begin{eqnarray*}
+                h(x) = \cos(x) - 2x\\
+                h'(x) = -\sin(x) - 2\\
+                h''(x) = -\cos(x)
+            \end{eqnarray*}
+            So, 
+<<>>=
+fa <- function(x) cos(x) - 2*x
+fa.fd <- function(x) -sin(x) - 2
+fa.sd <- function(x) -cos(x)
+for (i in 1:3){
+    cat("x0 =", i, fill=T)
+    (xa <- newton.quad(fa, fa.fd, fa.sd, i, 1e-6, 100, verbose=T))
+}
+@
+    If we compare the results with a Newton method using only the first-order expansion, we will get,
+<<>>=
+newton <- function(f, f.prime, x0, eps, max.iter){
+    x1 <- x0 - f(x0)/f.prime(x0)
+    iter <- 1
+    while(abs(x1 - x0) > eps & iter < max.iter){
+        x0 <- x1
+        x1 <- x0 - f(x0)/f.prime(x0)
+        cat("[ITER]", iter, "/", x1, fill=T)
+        iter <- iter + 1
+    }
+
+    if (abs(x1 - x0) < eps){
+        return (x1)
+    } else {
+        return (NULL)
+    }
+}
+(xa.1 <- newton(fa, fa.fd, 3, 1e-6, 100))
+@
+    Both methods converge to \verb|x=|\Sexpr{round(xa, 6)}, and we can check that,
+<<>>=
+fa(xa)
+@
+    So $x$ is indeed the root for $h(x)$, \emph{i.e.} fixed point for $f(x) = \cos(x) - x$.
+
+    \item Following the similar fashion, given $f(x) = \log(x) - \exp(-x)$,
+<<>>=
+fb <- function(x) log(x) - exp(-x) - x
+fb.fd <- function(x) 1/x + exp(-x) - 1
+fb.sd <- function(x) -1/x^2 - exp(-x)
+(xb <- newton.quad(fb, fb.fd, fb.sd, 2, 1e-6, 100, verbose=T))
+fb(xb)
+@
+    We can see that \verb|x=|\Sexpr{round(xb, 7)} is not the root for $h(x)$. Actually, there's no root for $h(x)$ as $h(x)$ never traverses $x$-axis for $\forall x \in (0, \infty)$.
+
+    \item For $f(x) = x^3-x-3$, $h(x) = x^3-2x-3$.
+<<>>=
+fc <- function(x) x^3 - 2*x - 3
+fc.fd <- function(x) 3*x^2 - 2
+fc.sd <- function(x) 6*x
+(xc <- newton.quad(fc, fc.fd, fc.sd, 0, 1e-6, 100, verbose=T))
+fc(xc)
+@
+    So it converges to \verb|x=|\Sexpr{round(xc, 7)}, which is not a fixed point for $f(x)$, even though it converges fast.
+
+    If we use the Newton-Raphson method, we will get,
+<<>>=
+(xc.1 <- newton(fc, fc.fd, 0, 1e-6, 100))
+fc(xc.1)
+@
+    We can see that through trials and errors, the Newton-Raphson converges to the true fixed point for $f(x)$, after 32 iterations, whereas the Newton method using second-order expansion didn't.
+
+    To conclude, while the second-order Newton method converges faster than its first-order counterpart, it tends to converge to a local maximum rather than the true root of a function.
+
+    \item For $f(x) = x^3-7x^2+ 14x -8$, 
+<<>>=
+fd <- function(x) x^3 - 7*x^2 + 13*x - 8
+fd.fd <- function(x) 3*x^2 - 14 * x + 13 
+fd.sd <- function(x) 6*x - 14
+for (i in 1 + (1:9)/10){
+    cat("x0=", i, fill=T)
+    xd <- newton.quad(fd, fd.fd, fd.sd, i, 1e-6, 100, verbose=T)
+}
+fd(xd)
+@
+    In all cases, the second-order Newton method converges to \verb|x=|\Sexpr{round(xd, 7)}, which is, again, not the true fixed point. The only difference between using different $x_0$ is that it takes longer to converge for larger $x_i$'s. 
+
+    Now we try the Newton-Raphson method,
+<<>>=
+(xd.1 <- newton(fd, fd.fd, 1.9, 1e-6, 100))
+fd(xd.1)
+@
+    Surprisingly, it converges to the fixed point of $f(x)$, though it takes longer to converge.
+
+    \item Finally, for $f(x) = \log(x) \exp(-x)$, we have,
+<<>>=
+fe <- function(x) log(x)*exp(-x) - x
+fe.fd <- function(x) exp(-x)/x - log(x) * exp(-x) - 1
+fe.sd <- function(x) -(exp(-x)*x + exp(-x))/(x^2) - exp(-x)/x + log(x) * exp(-x)
+xe <- newton.quad(fe, fe.fd, fe.sd, 2, 1e-6, 100, verbose=T)
+@
+    So, we simply can't converge because $x_1$ is negative and \verb=NaN= will be produced by feeding a negative $x$ to $\log(x)$. Same story for Newton-Raphson method (results not shown).
+    \end{enumerate}
+
+    If from these examples we learnt anything, it is that while using second-order expansion leads to faster convergence, the accuracy is actually inferior. In many cases, the algorithm converges to a local maximum/minimum instead of converging to the root of the function. I guess that's why no one bothers to use the second-order expansion and stays with the Newton-Raphson method.
+\section{}
+\begin{enumerate}[(a)]
+    \item To plot the log likelihood function, we get,
+<<fig=TRUE>>=
+log.ll <- function(x, theta) {-length(x) * log(2*pi) + sum(log(1-cos(x-theta)))}
+x <- c(3.91, 4.85, 2.28, 4.06, 3.70, 4.04, 5.46, 3.53, 2.28, 1.96, 2.53, 3.88, 2.22, 3.47, 4.82, 2.46, 2.99, 2.54, 0.52, 2.50)
+theta <- seq(-pi, pi, length.out=500)
+plot(theta, sapply(theta, log.ll, x=x), typ='l',
+     xlab=expression(theta), ylab=expression(l(theta)))
+@
+
+    which is a complex function with funny shape, and with a lot of local maxima/minima. 
+    \item Now we use the \verb=optimize()= function to find the maximum of this log likelihood function on $(-\pi, pi)$. Since \verb=optimize()= takes a function with argument \verb=x= for optimization, we need to rewrite our \verb=log.ll= function a little bit.
+<<>>=
+log.ll2 <- function(x){
+    # X is theta here
+    x.i <- c(3.91, 4.85, 2.28, 4.06, 3.70, 4.04, 5.46, 3.53, 2.28, 1.96, 2.53, 3.88, 2.22, 3.47, 4.82, 2.46, 2.99, 2.54, 0.52, 2.50)
+    return (-length(x.i) * log(2*pi) + sum(log(1-cos(x.i-x))))
+}
+(theta.hat <- optimize(log.ll2, c(-pi, pi), tol=1e-8, maximum=T))
+@
+    So, the maximal likelihood estimator $\hat \theta$ is \Sexpr{round(theta.hat$maximum, 7)} and $l(\hat \theta)=~$\Sexpr{round(theta.hat$objective, 7)}.
+    \item Now we use the \verb=newton()= function we have implemented previously.
+<<>>=
+# First derivative of log-likelihood function
+dl <- function(theta){
+    x.i <- c(3.91, 4.85, 2.28, 4.06, 3.70, 4.04, 5.46, 3.53, 2.28, 1.96, 2.53, 
+             3.88, 2.22, 3.47, 4.82, 2.46, 2.99, 2.54, 0.52, 2.50)
+    return (-sum(sin(x.i-theta)/(1-cos(x.i-theta))))
+}
+
+# Second derivative
+d2l <- function(theta){
+    x.i <- c(3.91, 4.85, 2.28, 4.06, 3.70, 4.04, 5.46, 3.53, 2.28, 1.96, 2.53,
+             3.88, 2.22, 3.47, 4.82, 2.46, 2.99, 2.54, 0.52, 2.50)
+    return (-sum(1/(1-cos(x.i-theta))))
+}
+
+for (x0 in c(0, -1.5, -2.0, -2.7)){
+    cat("x0 =", x0, fill=T)
+    newton(dl, d2l, x0, 1e-6, 100)
+}
+@
+    We can see that, if we start ``close enough'' to the root, the Newton-Raphson method can converge to the expected truth. Otherwise, because the log-likihood function, as we saw moments ago, has a lot of local maxima/mimima, the method can't guarantee convergence to the root.
+\end{enumerate}
+
+\end{document}
